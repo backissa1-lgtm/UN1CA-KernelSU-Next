@@ -70,6 +70,7 @@ jobs:
           python3 scripts/fix_susfs_readdir.py "$PWD/candidate/fs/readdir.c"
           python3 scripts/wire_susfs23.py "$PWD/candidate/KernelSU-Next/kernel/supercall/supercall.c" "$PWD/candidate/KernelSU-Next/kernel/core/init.c"
           python3 scripts/fix_susfs_dcache.py "$PWD/candidate/fs/dcache.c"
+          python3 scripts/port_susfs_proc_v23.py "$PWD/candidate"
           python3 scripts/scan_stale_susfs.py "$PWD/candidate" "$PWD/audit/stale-susfs-references.txt"
           git -C candidate add -N -- KernelSU-Next/kernel KernelSU-Next/uapi
           git -C candidate diff -- KernelSU-Next/kernel KernelSU-Next/uapi > audit/candidate.patch

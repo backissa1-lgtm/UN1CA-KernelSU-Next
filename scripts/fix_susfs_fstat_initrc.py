@@ -15,6 +15,7 @@ pat=(r'#ifdef CONFIG_KSU_SUSFS\n'
      r'extern void ksu_handle_vfs_fstat\(int fd, loff_t \*kstat_size_ptr\);\n'
      r'#endif\n')
 s,n=re.subn(pat,"",s,count=1)
+decl_found=n
 if n==0:
     if "ksu_is_init_rc_hook_enabled" in s or "ksu_handle_vfs_fstat" in s:
         raise SystemExit("Partial obsolete fstat hook remains; refusing silent removal")

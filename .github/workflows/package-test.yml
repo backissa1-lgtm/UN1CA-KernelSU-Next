@@ -1,0 +1,61 @@
+name: Validate G965F experimental installer packaging
+on:
+  push:
+    branches: [flashable-package]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tools
+        run: |
+          set -e
+          sudo apt-get update -qq
+          sudo apt-get install -y git-lfs unzip zip bsdiff file
+      - name: Download previously compiled baseline boot image
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 39623416412
+          name: UNVERIFIED-G965F-build-results
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: previous-build
+
+      - name: Retrieve proven UN1CA G965F ZIP from maintainer Git LFS
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GIT_LFS_SKIP_SMUDGE=1
+          git clone --filter=blob:none --depth 1 --branch Android-16 --sparse \
+            https://github.com/Eend15/Unofficial-Un1ca-9810.git rom
+          git -C rom sparse-checkout set platform/exynos9810/prebuilt
+          git -C rom lfs pull --include="platform/exynos9810/prebuilt/DS-ACK-V1.12-30.09.2026-Enforcing-KernelSU-Next-v3.4.0-SuSFS-erofs-dtb.zip"
+
+      - name: Build ZIP with preserved maintainer DTB and device ramdisk
+        shell: bash
+        run: |
+          set -euo pipefail
+          img="previous-build/kernel/Apollo/Product/DS-ACK-V1.12-G965F-21.10.2026-KSU.img"
+          z="rom/platform/exynos9810/prebuilt/DS-ACK-V1.12-30.09.2026-Enforcing-KernelSU-Next-v3.4.0-SuSFS-erofs-dtb.zip"
+          test -s "$img" && test -s "$z"
+          bash scripts/create_g965f_zip.sh "$z" "$img" "$PWD/EXPERIMENTAL-G965F-package-validation.zip"
+          unzip -p EXPERIMENTAL-G965F-package-validation.zip BUILD-NOTES.txt > build-notes.txt
+          unzip -p EXPERIMENTAL-G965F-package-validation.zip META-INF/com/google/android/update-binary | grep "grep 'G965F'"
+          cat build-notes.txt
+
+      - name: Upload experimental ZIP
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: EXPERIMENTAL-G965F-BASELINE-PACKAGING-TEST
+          path: |
+            EXPERIMENTAL-G965F-package-validation.zip
+            build-notes.txt
+          retention-days: 10
+          if-no-files-found: warn

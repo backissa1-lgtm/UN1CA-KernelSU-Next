@@ -24,8 +24,10 @@ pat=(r'#ifdef CONFIG_KSU_SUSFS\n'
      r'\s*if \(static_branch_unlikely\(&ksu_is_init_rc_hook_enabled\)\)\n'
      r'\s*ksu_handle_vfs_fstat\(fd, &stat->size\);\n'
      r'#endif\n')
+call_found=len(re.findall(pat,s))
+if call_found>1 or call_found!=decl_found:
+    raise SystemExit(f"Incomplete old fstat hook: prototype={decl_found}, callback={call_found}")
 s,n=re.subn(pat,"",s,count=1)
-if n!=1:raise SystemExit(f"Expected obsolete initrc fstat call once, got {n}")
 if 'ksu_is_init_rc_hook_enabled' in s:raise SystemExit("Removed field still in source")
 p.write_text(s)
 print("Removed obsolete ReSukiSU init-rc fstat callback; Samsung vfs_fstat preserved")

@@ -61,6 +61,7 @@ jobs:
             cp "kernel/KernelSU-Next/kernel/$p" "candidate/KernelSU-Next/kernel/$p"
           done
           python3 scripts/fix_ksu_execveat.py candidate/KernelSU-Next/kernel/core/init.c candidate/KernelSU-Next/kernel/runtime/ksud.h candidate/KernelSU-Next/kernel/runtime/ksud_integration.c
+          python3 scripts/fix_ksu_selinux.py candidate/KernelSU-Next/kernel/selinux/rules.c
           git -C candidate add -N -- KernelSU-Next/kernel KernelSU-Next/uapi
           git -C candidate diff -- KernelSU-Next/kernel KernelSU-Next/uapi > audit/candidate.patch
           git -C candidate diff --stat > audit/candidate-stat.txt

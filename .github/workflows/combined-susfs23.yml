@@ -63,6 +63,7 @@ jobs:
           python3 scripts/port_susfs_proc_v23.py "$PWD/candidate"
           python3 scripts/port_susfs_statfs_fd.py "$PWD/candidate"
           python3 scripts/port_susfs_inotify.py "$PWD/candidate/fs/notify/fdinfo.c"
+          python3 scripts/fix_susfs_cmdline_v23.py "$PWD/candidate/fs/proc/cmdline.c"
           python3 scripts/port_susfs_namespace_ids.py "$PWD/candidate/fs/namespace.c"
           python3 scripts/add_susfs_mount_helpers.py "$PWD/candidate/fs/namespace.c"
           python3 scripts/scan_stale_susfs.py "$PWD/candidate" "$PWD/audit/stale-susfs-references.txt"

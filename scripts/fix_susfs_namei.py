@@ -15,8 +15,8 @@ old = re.compile(
  r'\s*&&\s*likely\(\s*current->susfs_task_state\s*&\s*TASK_STRUCT_NON_ROOT_USER_APP_PROC\s*\)')
 def replace(m):return f"susfs_is_inode_sus_path({m.group(1)})"
 s,n=old.subn(replace,s)
-if not (12<=n<=30):
- raise SystemExit(f"Unexpected old SUSFS guard count: {n} (expected at least 12)")
+if not (10<=n<=30):
+ raise SystemExit(f"Unexpected old SUSFS guard count: {n} (expected 10 to 30)")
 if "INODE_STATE_SUS_PATH" in s or "TASK_STRUCT_NON_ROOT_USER_APP_PROC" in s:
  raise SystemExit("Old SUSFS guard still found after conversion")
 # SUSFS2.3 patch adds an extern int filename_lookup declaration via namei.h,

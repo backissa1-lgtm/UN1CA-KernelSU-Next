@@ -93,8 +93,9 @@ jobs:
             libssl-dev libelf-dev libncurses-dev cpio lz4 zstd python3 device-tree-compiler xz-utils
           df -h .
 
-      - name: Cache Android Clang 20
-        uses: actions/cache@v4
+      - name: Restore Android Clang 20 cache
+        id: clang-cache
+        uses: actions/cache/restore@v4
         with:
           path: ${{ runner.temp }}/google-clang20
           key: google-clang20-r547379-linux-v1
@@ -113,6 +114,13 @@ jobs:
           fi
           test -x "$RUNNER_TEMP/google-clang20/bin/clang"
           echo "DS_ACK_TOOLCHAIN=$RUNNER_TEMP/google-clang20" >> "$GITHUB_ENV"
+
+      - name: Save Android Clang 20 cache before compilation
+        if: steps.clang-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/google-clang20
+          key: google-clang20-r547379-linux-v1
 
       - name: Compile original ROM source baseline - SM-G965F
         id: baseline

@@ -59,6 +59,22 @@ jobs:
           grep -E 'FAILED|Reversed|Skipping|malformed|not found|saving rejects|Hunk #' audit/patch-dryrun.log | tail -80 || true
           echo 'SUSFS v2.3.0 header:'
           grep SUSFS_VERSION kernel-susfs-candidate/include/linux/susfs.h | head -1 || true
+          # Produce actual rejected hunks for a subsequent manual port.
+          git -C kernel worktree add --detach ../susfs-partial HEAD
+          cp susfs-port/kernel_patches/fs/susfs.c susfs-partial/fs/susfs.c
+          cp susfs-port/kernel_patches/include/linux/susfs.h susfs-partial/include/linux/susfs.h
+          cp susfs-port/kernel_patches/include/linux/susfs_def.h susfs-partial/include/linux/susfs_def.h
+          (
+            cd susfs-partial
+            set +e
+            patch -p1 --batch --forward < ../susfs-port/kernel_patches/50_add_susfs_in_kernel-4.9.patch > ../audit/partial-apply.log 2>&1
+            echo "$?" > ../audit/partial-apply-exit-code.txt
+            find . -name '*.rej' -print | sort > ../audit/rejected-files.txt
+            grep -E '^checking file |^patching file |^Hunk #[0-9]+ FAILED' ../audit/partial-apply.log > ../audit/hunk-status.txt || true
+            tar -czf ../audit/rejected-hunks.tar.gz -T ../audit/rejected-files.txt || true
+            git diff --stat > ../audit/partial-apply-stat.txt
+            git diff -- fs kernel security drivers mm > ../audit/partial-apply.patch
+          )
           echo 'Audit only; no kernel artifact is produced.'
       - name: Upload compatibility audit
         if: always()
@@ -73,5 +89,11 @@ jobs:
             audit/git-apply-*.txt
             audit/git-apply-*.log
             audit/api-comparison.txt
+            audit/partial-apply*.txt
+            audit/partial-apply*.log
+            audit/partial-apply*.patch
+            audit/rejected-files.txt
+            audit/rejected-hunks.tar.gz
+            audit/hunk-status.txt
           retention-days: 30
           if-no-files-found: warn

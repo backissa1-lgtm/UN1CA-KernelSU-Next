@@ -1,0 +1,63 @@
+name: Package updated G965F KernelSU Next candidate
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_run_id:
+        description: GitHub Actions run ID containing the compiled candidate kernel
+        required: true
+        type: string
+        default: "39644687489"
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install bsdiff and zip tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y bsdiff zip unzip python3
+      - name: Fetch verified template ZIP
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 39640616643
+          name: EXPERIMENTAL-G965F-BASELINE-PACKAGING-TEST
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: template-artifact
+      - name: Fetch compiled KernelSU Next candidate
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.kernel_run_id }}
+          name: UNVERIFIED-G965F-build-results
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: candidate-build
+      - name: Rebase candidate image into tested G965F installer
+        shell: bash
+        run: |
+          set -euo pipefail
+          img="$(find candidate-build/candidate -type f -name '*G965F*.img' -size +0c -print -quit)"
+          test -n "$img" && test -s "$img"
+          test -s template-artifact/EXPERIMENTAL-G965F-package-validation.zip
+          bash scripts/repackage_from_template.sh \
+            template-artifact/EXPERIMENTAL-G965F-package-validation.zip \
+            "$img" "$PWD/EXPERIMENTAL-G965F-KSUNext-Test.zip"
+          unzip -p EXPERIMENTAL-G965F-KSUNext-Test.zip BUILD-NOTES.txt \
+            > candidate-build-notes.txt
+          sha256sum EXPERIMENTAL-G965F-KSUNext-Test.zip \
+            > candidate-zip-sha256.txt
+      - name: Upload G965F boot-test ZIP
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: EXPERIMENTAL-G965F-KSUNEXT-TEST-ZIP
+          path: |
+            EXPERIMENTAL-G965F-KSUNext-Test.zip
+            candidate-build-notes.txt
+            candidate-zip-sha256.txt
+          if-no-files-found: warn
+          retention-days: 20

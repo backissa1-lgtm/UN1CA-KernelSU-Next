@@ -11,12 +11,12 @@ import re,sys
 if len(sys.argv)!=2: raise SystemExit("usage: fix_susfs_namei.py kernel/fs/namei.c")
 p=Path(sys.argv[1]);s=p.read_text()
 old = re.compile(
- r'unlikely\(\s*([A-Za-z_][A-Za-z_0-9]*(?:->[A-Za-z_][A-Za-z_0-9]*)+)->i_state\s*&\s*INODE_STATE_SUS_PATH\s*\)'
+ r'unlikely\(\s*([A-Za-z_][A-Za-z_0-9]*(?:->[A-Za-z_][A-Za-z_0-9]*)*)->i_state\s*&\s*INODE_STATE_SUS_PATH\s*\)'
  r'\s*&&\s*likely\(\s*current->susfs_task_state\s*&\s*TASK_STRUCT_NON_ROOT_USER_APP_PROC\s*\)')
 def replace(m):return f"susfs_is_inode_sus_path({m.group(1)})"
 s,n=old.subn(replace,s)
-if not (10<=n<=30):
- raise SystemExit(f"Unexpected old SUSFS guard count: {n} (expected 10 to 30)")
+if n != 14:
+ raise SystemExit(f"Unexpected old SUSFS guard count: {n} (expected exactly 14)")
 if "INODE_STATE_SUS_PATH" in s or "TASK_STRUCT_NON_ROOT_USER_APP_PROC" in s:
  raise SystemExit("Old SUSFS guard still found after conversion")
 # SUSFS2.3 patch adds an extern int filename_lookup declaration via namei.h,

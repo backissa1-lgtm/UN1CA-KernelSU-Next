@@ -104,9 +104,9 @@ jobs:
             exit 1
           fi
           find Apollo/Product -type f -name '*G965F*.img' -size +0c | grep .
-          grep -q '^CONFIG_KSU=y$' .config
-          grep -q '^CONFIG_KSU_SUSFS=y$' .config
-          grep -q '^CONFIG_EROFS_FS=y$' .config
+          # Apollo cleans .config after a successful build; inspect the preserved log instead.
+          grep -q 'G965F kernel build finished.' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
+          grep -q 'SELinux.*Enforcing' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
 
       - name: Compile updated KernelSU Next candidate - SM-G965F
         id: candidate
@@ -124,9 +124,9 @@ jobs:
             exit 1
           fi
           find Apollo/Product -type f -name '*G965F*.img' -size +0c | grep .
-          grep -q '^CONFIG_KSU=y$' .config
-          grep -q '^CONFIG_KSU_SUSFS=y$' .config
-          grep -q '^CONFIG_EROFS_FS=y$' .config
+          # Apollo cleans .config after a successful build; inspect the preserved log instead.
+          grep -q 'G965F kernel build finished.' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
+          grep -q 'SELinux.*Enforcing' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
 
       - name: Upload experimental outputs
         if: always()

@@ -60,7 +60,7 @@ jobs:
           for p in core/init.c runtime/ksud_integration.c manager/pkg_observer.c; do
             cp "kernel/KernelSU-Next/kernel/$p" "candidate/KernelSU-Next/kernel/$p"
           done
-          python3 scripts/fix_ksu_execveat.py candidate/KernelSU-Next/kernel/core/init.c candidate/KernelSU-Next/kernel/runtime/ksud.h
+          python3 scripts/fix_ksu_execveat.py candidate/KernelSU-Next/kernel/core/init.c candidate/KernelSU-Next/kernel/runtime/ksud.h candidate/KernelSU-Next/kernel/runtime/ksud_integration.c
           git -C candidate add -N -- KernelSU-Next/kernel KernelSU-Next/uapi
           git -C candidate diff -- KernelSU-Next/kernel KernelSU-Next/uapi > audit/candidate.patch
           git -C candidate diff --stat > audit/candidate-stat.txt

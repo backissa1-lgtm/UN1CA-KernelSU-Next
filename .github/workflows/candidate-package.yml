@@ -1,0 +1,56 @@
+name: Package a compiled UN1CA G965F candidate
+on:
+  workflow_dispatch:
+    inputs:
+      kernel_run_id:
+        description: "Successful Kernel development run ID with candidate boot image"
+        required: true
+        type: string
+permissions:
+  actions: read
+  contents: read
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install packaging tools
+        run: sudo apt-get update -qq && sudo apt-get install -y bsdiff unzip zip
+      - name: Fetch validated kernel installer template
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 39640616643
+          name: EXPERIMENTAL-G965F-BASELINE-PACKAGING-TEST
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: template
+      - name: Fetch compiled updated KernelSU Next image
+        uses: actions/download-artifact@v4
+        with:
+          run-id: ${{ inputs.kernel_run_id }}
+          name: UNVERIFIED-G965F-build-results
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: source-build
+      - name: Rebase G965F kernel only and verify contents
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_image="$(find source-build/candidate/Apollo/Product -type f -name '*G965F*.img' -size +0c -print -quit)"
+          test -n "$candidate_image" && test -s "$candidate_image"
+          export BUILD_RUN_ID=${{ inputs.kernel_run_id }}
+          bash scripts/package_new_candidate.sh \
+            template/EXPERIMENTAL-G965F-package-validation.zip \
+            "$candidate_image" "$PWD/UNVERIFIED-G965F-KernelSU-Next-test.zip"
+          sha256sum UNVERIFIED-G965F-KernelSU-Next-test.zip > SHA256SUMS.txt
+          unzip -p UNVERIFIED-G965F-KernelSU-Next-test.zip BUILD-NOTES.txt > BUILD-NOTES.txt
+      - name: Upload experimental image and checksums
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UNVERIFIED-G965F-KernelSU-Next-test-zip
+          path: |
+            UNVERIFIED-G965F-KernelSU-Next-test.zip
+            SHA256SUMS.txt
+            BUILD-NOTES.txt
+          retention-days: 14
+          if-no-files-found: warn

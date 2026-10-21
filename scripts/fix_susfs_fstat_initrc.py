@@ -15,7 +15,11 @@ pat=(r'#ifdef CONFIG_KSU_SUSFS\n'
      r'extern void ksu_handle_vfs_fstat\(int fd, loff_t \*kstat_size_ptr\);\n'
      r'#endif\n')
 s,n=re.subn(pat,"",s,count=1)
-if n!=1:raise SystemExit(f"Expected obsolete initrc stat declaration once, got {n}")
+if n==0:
+    if "ksu_is_init_rc_hook_enabled" in s or "ksu_handle_vfs_fstat" in s:
+        raise SystemExit("Partial obsolete fstat hook remains; refusing silent removal")
+    print("Samsung stat.c has no stale init-rc callback; no change required")
+    raise SystemExit(0)
 pat=(r'#ifdef CONFIG_KSU_SUSFS\n'
      r'\s*if \(static_branch_unlikely\(&ksu_is_init_rc_hook_enabled\)\)\n'
      r'\s*ksu_handle_vfs_fstat\(fd, &stat->size\);\n'

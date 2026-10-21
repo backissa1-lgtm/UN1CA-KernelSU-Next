@@ -9,7 +9,7 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 template="$(realpath "$1")"
 image="$(realpath "$2")"
 output="$(realpath -m "$3")"
-template_sha="d2ac43cad7f331aed9eebf7627f502e273ebe068e7675bf7ecc75c031fff95ca"
+template_sha="3c10792029483d354e8b2e9072379cd0a9af653b003f3f319530d6852a8d0a2f"
 original_sha="3e405a08fd5e0b4f8492096be9003349bb8372e4f16ec43f0308095d6615203f"
 echo "$template_sha  $template" | sha256sum -c -
 for cmd in bsdiff bspatch unzip zip python3; do command -v "$cmd" >/dev/null; done

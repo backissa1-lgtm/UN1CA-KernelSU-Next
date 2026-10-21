@@ -10,6 +10,11 @@ is assumed to exist.
 from pathlib import Path
 import sys
 p=Path(sys.argv[1]);s=p.read_text()
+if "extern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;" not in s:
+    anchor="extern bool susfs_is_current_ksu_domain(void);"
+    if s.count(anchor)!=1:
+        raise SystemExit("Missing unique Samsung SUSFS domain extern")
+    s=s.replace(anchor,anchor+"\nextern struct static_key_true susfs_is_sdcard_android_data_not_decrypted;",1)
 if "DEFINE_SEQLOCK(mount_lock)" not in s or "read_seqlock_excl(&mount_lock)" not in s:
     raise SystemExit("Not Samsung mount_lock implementation")
 if "susfs_get_non_sus_mnt_id_from_mnt" in s or "susfs_get_non_sus_vfsmnt_from_vfsmnt" in s:

@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   kernel:
@@ -162,6 +163,40 @@ jobs:
           retention-days: 14
           if-no-files-found: warn
 
+      - name: Download verified UN1CA G965F installer template
+        if: steps.candidate.outcome == 'success'
+        uses: actions/download-artifact@v4
+        with:
+          run-id: 39648252101
+          name: EXPERIMENTAL-G965F-BASELINE-PACKAGING-TEST
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: template
+
+      - name: Package combined kernel with proven UN1CA DTB
+        if: steps.candidate.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate_image="$(find candidate/Apollo/Product -type f -name '*G965F*.img' -size +0c -print -quit)"
+          test -n "$candidate_image" && test -s "$candidate_image"
+          export BUILD_RUN_ID="${{ github.run_id }}"
+          bash scripts/package_new_candidate.sh \
+            template/EXPERIMENTAL-G965F-package-validation.zip \
+            "$candidate_image" "$PWD/UNVERIFIED-G965F-KSU33315-SUSFS230.zip"
+          sha256sum UNVERIFIED-G965F-KSU33315-SUSFS230.zip > SHA256SUMS.txt
+          unzip -p UNVERIFIED-G965F-KSU33315-SUSFS230.zip BUILD-NOTES.txt > BUILD-NOTES.txt
+
+      - name: Upload experimental G965F combined kernel ZIP
+        if: steps.candidate.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: UNVERIFIED-G965F-KSUNext-SUSFS23-TESTZIP
+          path: |
+            UNVERIFIED-G965F-KSU33315-SUSFS230.zip
+            SHA256SUMS.txt
+            BUILD-NOTES.txt
+          retention-days: 14
+          if-no-files-found: error
       - name: Record status
         if: always()
         run: echo 'Experimental compilation only; no successful boot or SUSFS runtime verification is implied.' >> "$GITHUB_STEP_SUMMARY"

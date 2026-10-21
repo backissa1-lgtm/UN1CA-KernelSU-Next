@@ -1,0 +1,55 @@
+name: UN1CA known-working boot package audit
+on:
+  push:
+    branches: [prebuilt-audit]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  prebuilt:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Git LFS and archive tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y git-lfs unzip zip bsdiff file
+      - name: Fetch ROM maintainer's tested G965F EROFS package
+        shell: bash
+        run: |
+          set -euo pipefail
+          export GIT_LFS_SKIP_SMUDGE=1
+          git clone --filter=blob:none --depth 1 --branch Android-16 --sparse \
+            https://github.com/Eend15/Unofficial-Un1ca-9810.git rom
+          git -C rom sparse-checkout set platform/exynos9810/prebuilt
+          cd rom
+          git lfs pull --include="platform/exynos9810/prebuilt/DS-ACK-V1.12-30.09.2026-Enforcing-KernelSU-Next-v3.4.0-SuSFS-erofs-dtb.zip"
+          cd ..
+          mkdir -p audit
+          zip_file="rom/platform/exynos9810/prebuilt/DS-ACK-V1.12-30.09.2026-Enforcing-KernelSU-Next-v3.4.0-SuSFS-erofs-dtb.zip"
+          echo '3e405a08fd5e0b4f8492096be9003349bb8372e4f16ec43f0308095d6615203f  '"$zip_file" | sha256sum -c -
+          unzip -t "$zip_file" > audit/zip-integrity.txt
+          unzip -Z1 "$zip_file" > audit/package-file-list.txt
+          unzip -l "$zip_file" > audit/package-file-sizes.txt
+          unzip -q "$zip_file" -d unpack
+          find unpack -maxdepth 4 -type f -printf '%P %k KB\n' | sort > audit/unpacked-tree.txt
+          find unpack -maxdepth 4 -type f -print0 | xargs -0 -r file > audit/file-types.txt
+          grep -RInE 'G965F|star2lte|boot.img|bspatch|dtb|zImage' unpack/META-INF unpack/floyd/*.sh > audit/installer-targets.txt 2>/dev/null || true
+          if test -f unpack/META-INF/com/google/android/update-binary; then
+            head -c 50000 unpack/META-INF/com/google/android/update-binary > audit/update-binary-head.txt
+          fi
+          echo 'Matched target files:' >> audit/package-file-sizes.txt
+          grep -Ei 'G965F|STAR2LTE|zImage|dtb|kernel' audit/package-file-list.txt >> audit/package-file-sizes.txt || true
+          echo 'Known-working source package was verified by SHA-256, not assumed identical to the October 1 kernel source.' > audit/NOTES.txt
+
+      - name: Upload packaging analysis
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: UN1CA-G965F-known-working-package-audit
+          path: audit/
+          if-no-files-found: warn
+          retention-days: 30

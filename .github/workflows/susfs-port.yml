@@ -1,0 +1,77 @@
+name: SUSFS 2.3.0 port compatibility audit
+on:
+  push:
+    branches: [susfs-port]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  susfs:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install patch tools
+        run: sudo apt-get update -qq && sudo apt-get install -y patch git rsync
+      - name: Fetch pinned source revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          git clone --filter=blob:none --depth 1 --branch 'duhan-(4.9.337)' https://github.com/Eend15/exynos9810-kernel.git kernel
+          git -C kernel fetch --depth 1 origin 8f29b4e0e977d521bb5866ad167b391bea2988c9
+          git -C kernel checkout --detach 8f29b4e0e977d521bb5866ad167b391bea2988c9
+          git clone --filter=blob:none --depth 1 --branch kernel-4.9-v2 https://github.com/wxx9248/susfs4ksu.git susfs-port
+          git -C susfs-port fetch --depth 1 origin 71345ded5af28f55d76ebcdc7a9df9cea56111e1
+          git -C susfs-port checkout --detach 71345ded5af28f55d76ebcdc7a9df9cea56111e1
+          mkdir -p audit
+          echo 'Original source:' > audit/versions.txt
+          git -C kernel rev-parse HEAD >> audit/versions.txt
+          echo 'SUSFS v2.3.0 Linux 4.9 adaptation:' >> audit/versions.txt
+          git -C susfs-port rev-parse HEAD >> audit/versions.txt
+      - name: Determine patch collisions with Eend15 SUSFS
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp kernel/include/linux/susfs.h audit/existing-susfs-header.h
+          grep 'SUSFS_VERSION' kernel/include/linux/susfs.h | head -1 > audit/existing-version.txt
+          cp -a kernel kernel-susfs-candidate
+          cp susfs-port/kernel_patches/fs/susfs.c kernel-susfs-candidate/fs/susfs.c
+          cp susfs-port/kernel_patches/include/linux/susfs.h kernel-susfs-candidate/include/linux/susfs.h
+          cp susfs-port/kernel_patches/include/linux/susfs_def.h kernel-susfs-candidate/include/linux/susfs_def.h
+          (
+            cd kernel-susfs-candidate
+            set +e
+            patch --dry-run -p1 --batch --forward \
+              < ../susfs-port/kernel_patches/50_add_susfs_in_kernel-4.9.patch \
+              > ../audit/patch-dryrun.log 2>&1
+            echo "$?" > ../audit/patch-exit-code.txt
+            git apply --check ../susfs-port/kernel_patches/50_add_susfs_in_kernel-4.9.patch \
+              > ../audit/git-apply-check.log 2>&1
+            echo "$?" > ../audit/git-apply-exit-code.txt
+          )
+          echo 'Linux 4.9 SUSFS source APIs:' > audit/api-comparison.txt
+          grep -Rhn 'CONFIG_KSU_SUSFS' kernel/KernelSU-Next/kernel/Kconfig kernel/arch/arm64/configs/apollo_defconfig | head -50 >> audit/api-comparison.txt || true
+          echo 'Expected integration mismatch: v2.3.0 port expects ReSukiSU hooks; kernel uses KernelSU Next manual reboot hook.' >> audit/api-comparison.txt
+          echo 'Patch dry-run exit:' && cat audit/patch-exit-code.txt
+          echo 'Patch failure summary:'
+          grep -E 'FAILED|Reversed|Skipping|malformed|not found|saving rejects|Hunk #' audit/patch-dryrun.log | tail -80 || true
+          echo 'SUSFS v2.3.0 header:'
+          grep SUSFS_VERSION kernel-susfs-candidate/include/linux/susfs.h | head -1 || true
+          echo 'Audit only; no kernel artifact is produced.'
+      - name: Upload compatibility audit
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: susfs-2-3-kernel-4-9-compatibility-audit
+          path: |
+            audit/versions.txt
+            audit/existing-version.txt
+            audit/patch-*.txt
+            audit/patch-*.log
+            audit/git-apply-*.txt
+            audit/git-apply-*.log
+            audit/api-comparison.txt
+          retention-days: 30
+          if-no-files-found: warn

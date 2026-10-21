@@ -74,6 +74,7 @@ jobs:
           PY
           python3 scripts/fix_susfs_open.py kernel/fs/open.c
           python3 scripts/fix_susfs_duplicate_hooks.py kernel
+          python3 scripts/fix_susfs_stat_kstat.py kernel/fs/stat.c
           git -C kernel diff --stat > audit/partial-merge-stat.txt
           git -C kernel diff -- fs kernel mm security drivers include > audit/partial-merge.patch
           echo 'Partial SUSFS integration only; NOT FLASHABLE.' > audit/NOT-FLASHABLE.txt

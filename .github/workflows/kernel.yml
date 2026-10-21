@@ -60,6 +60,7 @@ jobs:
           for p in core/init.c runtime/ksud_integration.c manager/pkg_observer.c; do
             cp "kernel/KernelSU-Next/kernel/$p" "candidate/KernelSU-Next/kernel/$p"
           done
+          python3 scripts/fix_ksu_execveat.py candidate/KernelSU-Next/kernel/core/init.c candidate/KernelSU-Next/kernel/runtime/ksud.h
           git -C candidate add -N -- KernelSU-Next/kernel KernelSU-Next/uapi
           git -C candidate diff -- KernelSU-Next/kernel KernelSU-Next/uapi > audit/candidate.patch
           git -C candidate diff --stat > audit/candidate-stat.txt
@@ -89,12 +90,16 @@ jobs:
       - name: Compile original ROM source baseline - SM-G965F
         id: baseline
         shell: bash
-        continue-on-error: true
+        if: github.event_name == 'workflow_dispatch'
         run: |
-          set -o pipefail
+          set -euo pipefail
           export TERM=xterm DS_ACK_JOBS=2
           cd kernel
           printf '2\n4\n2\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/baseline-build.log
+          if grep -q 'ERROR: G965F kernel compilation failed' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log; then
+            echo 'The Apollo wrapper suppressed the build failure; failing CI.' >&2
+            exit 1
+          fi
           find Apollo/Product -type f -name '*G965F*.img' -size +0c | grep .
           grep -q '^CONFIG_KSU=y$' .config
           grep -q '^CONFIG_KSU_SUSFS=y$' .config
@@ -103,15 +108,18 @@ jobs:
       - name: Compile updated KernelSU Next candidate - SM-G965F
         id: candidate
         shell: bash
-        continue-on-error: true
         run: |
-          set -o pipefail
+          set -euo pipefail
           export TERM=xterm DS_ACK_JOBS=2
           ksu_count="$(git -C upstream rev-list --count HEAD)"
           export KSU_VERSION_OVERRIDE="$((30000 + ksu_count + 289))"
           export KSU_VERSION_TAG_OVERRIDE="legacy-$(git -C upstream rev-parse --short=12 HEAD)"
           cd candidate
           printf '2\n4\n2\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/candidate-build.log
+          if grep -q 'ERROR: G965F kernel compilation failed' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log; then
+            echo 'The Apollo wrapper suppressed the build failure; failing CI.' >&2
+            exit 1
+          fi
           find Apollo/Product -type f -name '*G965F*.img' -size +0c | grep .
           grep -q '^CONFIG_KSU=y$' .config
           grep -q '^CONFIG_KSU_SUSFS=y$' .config

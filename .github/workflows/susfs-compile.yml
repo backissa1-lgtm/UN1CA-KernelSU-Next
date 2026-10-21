@@ -72,6 +72,7 @@ jobs:
               raise SystemExit("Expected one misplaced setresuid hook inside setreuid")
           p.write_text(code.replace(bad,"",1))
           PY
+          python3 scripts/fix_susfs_open.py kernel/fs/open.c
           git -C kernel diff --stat > audit/partial-merge-stat.txt
           git -C kernel diff -- fs kernel mm security drivers include > audit/partial-merge.patch
           echo 'Partial SUSFS integration only; NOT FLASHABLE.' > audit/NOT-FLASHABLE.txt

@@ -1,0 +1,112 @@
+name: SUSFS 2.3.0 compile probe (NOT FLASHABLE)
+on:
+  push:
+    branches: [susfs-port]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  susfs-compile:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 200
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install build dependencies and free disk
+        run: |
+          set -e
+          sudo rm -rf /usr/local/lib/android/sdk /usr/share/dotnet /opt/ghc /opt/hostedtoolcache/CodeQL || true
+          sudo apt-get update -qq
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+            git rsync curl wget zip unzip bsdiff make build-essential bc bison flex \
+            libssl-dev libelf-dev libncurses-dev cpio lz4 zstd python3 device-tree-compiler xz-utils
+
+      - name: Stage original UN1CA and SUSFS 2.3.0 source
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p audit
+          git clone --filter=blob:none --depth 1 --branch 'duhan-(4.9.337)' \
+            https://github.com/Eend15/exynos9810-kernel.git kernel
+          git -C kernel fetch --depth 1 origin 8f29b4e0e977d521bb5866ad167b391bea2988c9
+          git -C kernel checkout --detach 8f29b4e0e977d521bb5866ad167b391bea2988c9
+          git clone --filter=blob:none --depth 1 --branch kernel-4.9-v2 \
+            https://github.com/wxx9248/susfs4ksu.git susfs
+          git -C susfs fetch --depth 1 origin 71345ded5af28f55d76ebcdc7a9df9cea56111e1
+          git -C susfs checkout --detach 71345ded5af28f55d76ebcdc7a9df9cea56111e1
+          cp susfs/kernel_patches/fs/susfs.c kernel/fs/susfs.c
+          cp susfs/kernel_patches/include/linux/susfs.h kernel/include/linux/susfs.h
+          cp susfs/kernel_patches/include/linux/susfs_def.h kernel/include/linux/susfs_def.h
+          set +e
+          (cd kernel && patch --batch --forward -p1 < ../susfs/kernel_patches/50_add_susfs_in_kernel-4.9.patch) \
+            > audit/patch-application.log 2>&1
+          patch_ret=$?
+          set -e
+          echo "$patch_ret" > audit/patch-exit-status.txt
+          find kernel -name '*.rej' -print > audit/rejected-files.txt
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("kernel/fs/Makefile")
+          lines=p.read_text().splitlines(keepends=True)
+          x="obj-$(CONFIG_KSU_SUSFS) += susfs.o"
+          seen=False
+          out=[]
+          for l in lines:
+              if l.strip() == x:
+                  if seen: continue
+                  seen=True
+              out.append(l)
+          if not seen: raise SystemExit("Missing SUSFS Makefile object entry")
+          p.write_text("".join(out))
+          PY
+          git -C kernel diff --stat > audit/partial-merge-stat.txt
+          git -C kernel diff -- fs kernel mm security drivers include > audit/partial-merge.patch
+          echo 'Partial SUSFS integration only; NOT FLASHABLE.' > audit/NOT-FLASHABLE.txt
+
+      - name: Download Google Clang 20
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/google-clang20"
+          curl -fL --retry 3 --retry-delay 5 \
+            'https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86/+archive/refs/heads/main/clang-r547379.tar.gz' \
+            | tar -xz -C "$RUNNER_TEMP/google-clang20"
+          test -x "$RUNNER_TEMP/google-clang20/bin/clang"
+          echo "DS_ACK_TOOLCHAIN=$RUNNER_TEMP/google-clang20" >> "$GITHUB_ENV"
+
+      - name: Compile partial SUSFS port to identify API conflicts
+        id: probe
+        shell: bash
+        continue-on-error: true
+        run: |
+          set -euo pipefail
+          export TERM=xterm DS_ACK_JOBS=2
+          cd kernel
+          printf '2\n4\n2\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/compile.log
+          if grep -q 'ERROR: G965F kernel compilation failed' ../audit/compile.log; then
+            echo 'Partial SUSFS 2.3.0 port needs source/API reconciliation.'
+            exit 1
+          fi
+          test -s Apollo/Product/*G965F*.img
+
+      - name: Collect output and error diagnostics
+        if: always()
+        shell: bash
+        run: |
+          mkdir -p audit
+          grep -nE 'error:|undefined reference|No rule to make|ERROR:' \
+            audit/compile.log > audit/compiler-errors.txt 2>/dev/null || true
+          echo "Build outcome = ${{ steps.probe.outcome }}" > audit/outcome.txt
+          wc -l audit/compiler-errors.txt || true
+
+      - name: Upload only logs, patches, and rejected hunks
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SUSFS23-PARTIAL-PORT-COMPILER-DIAGNOSTICS
+          path: |
+            audit/
+            kernel/**/*.rej
+          if-no-files-found: warn
+          retention-days: 20

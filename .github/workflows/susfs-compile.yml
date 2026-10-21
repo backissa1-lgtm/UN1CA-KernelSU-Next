@@ -60,6 +60,18 @@ jobs:
           if not seen: raise SystemExit("Missing SUSFS Makefile object entry")
           p.write_text("".join(out))
           PY
+          # The v2.3.0 patch matches the wrong syscall in Samsung 4.9:
+          # SYSCALL_DEFINE2(setreuid) has no suid parameter. Do not retain
+          # this broken hook. Correct kernel-side sucompat integration later.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("kernel/kernel/sys.c")
+          code=p.read_text()
+          bad="#ifdef CONFIG_KSU_SUSFS\n\t(void)ksu_handle_setresuid(ruid, euid, suid);\n#endif\n\n"
+          if code.count(bad)!=1:
+              raise SystemExit("Expected one misplaced setresuid hook inside setreuid")
+          p.write_text(code.replace(bad,"",1))
+          PY
           git -C kernel diff --stat > audit/partial-merge-stat.txt
           git -C kernel diff -- fs kernel mm security drivers include > audit/partial-merge.patch
           echo 'Partial SUSFS integration only; NOT FLASHABLE.' > audit/NOT-FLASHABLE.txt

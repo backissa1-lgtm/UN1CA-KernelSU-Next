@@ -22,7 +22,7 @@ jobs:
       - name: Fetch validated kernel installer template
         uses: actions/download-artifact@v4
         with:
-          run-id: 39640616643
+          run-id: 39648252101
           name: EXPERIMENTAL-G965F-BASELINE-PACKAGING-TEST
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: template

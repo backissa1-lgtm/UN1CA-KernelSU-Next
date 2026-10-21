@@ -68,6 +68,7 @@ jobs:
           python3 scripts/add_susfs_mount_helpers.py "$PWD/candidate/fs/namespace.c"
           python3 scripts/reconcile_susfs23_linker.py "$PWD/candidate"
           python3 scripts/fix_susfs_fstat_initrc.py "$PWD/candidate/fs/stat.c"
+          python3 scripts/wire_susfs_setresuid.py "$PWD/candidate/KernelSU-Next/kernel/hook/setuid_hook.c"
           python3 scripts/scan_stale_susfs.py "$PWD/candidate" "$PWD/audit/stale-susfs-references.txt"
           git -C candidate add -N -- KernelSU-Next/kernel KernelSU-Next/uapi
           git -C candidate diff -- KernelSU-Next/kernel KernelSU-Next/uapi > audit/candidate.patch

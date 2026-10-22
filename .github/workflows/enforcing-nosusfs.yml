@@ -56,6 +56,24 @@ jobs:
           python3 scripts/fix_ksu_symbol_lookup.py candidate/KernelSU-Next/kernel/supercall/dispatch.c
           # Boot isolation: use KernelSU Next and original UN1CA tree, no SUSFS hooks.
           python3 scripts/disable_susfs.py "$PWD/candidate/arch/arm64/configs/apollo_defconfig"
+          # The pinned 4.9 tree retains an obsolete devpts entry point from
+          # legacy KSU. The current KernelSU Next driver does not export it.
+          # Remove only this obsolete hook in the no-SUSFS diagnostic candidate.
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path("candidate/drivers/tty/pty.c")
+          s=p.read_text()
+          hooks=[
+              "#ifdef CONFIG_KSU\nextern int ksu_handle_devpts(struct inode*);\n#endif\n",
+              "#ifdef CONFIG_KSU\n\tksu_handle_devpts((struct inode *)file->f_path.dentry->d_inode);\n#endif\n",
+          ]
+          for h in hooks:
+              if s.count(h) != 1: raise SystemExit("Unexpected legacy devpts hook layout")
+              s=s.replace(h,"",1)
+          if "ksu_handle_devpts" in s: raise SystemExit("Legacy devpts reference remains")
+          p.write_text(s)
+          print("Removed obsolete KernelSU devpts hook; SELinux remains Enforcing")
+          PY
           git -C candidate add -N -- KernelSU-Next/kernel KernelSU-Next/uapi
           git -C candidate diff -- KernelSU-Next/kernel KernelSU-Next/uapi > audit/candidate.patch
           git -C candidate diff --stat > audit/candidate-stat.txt

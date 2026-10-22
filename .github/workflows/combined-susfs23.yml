@@ -1,7 +1,7 @@
-name: Combined KernelSU Next + SUSFS 2.3 for G965F
+name: Diagnostic Permissive KernelSU Next + SUSFS 2.3 for G965F
 on:
   push:
-    branches: [combined-ksun-susfs23]
+    branches: [diagnostic-permissive]
   workflow_dispatch:
 
 permissions:
@@ -133,7 +133,7 @@ jobs:
           set -euo pipefail
           export TERM=xterm DS_ACK_JOBS=2
           cd kernel
-          printf '2\n4\n2\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/baseline-build.log
+          printf '2\n4\n1\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/baseline-build.log
           if grep -q 'ERROR: G965F kernel compilation failed' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log; then
             echo 'The Apollo wrapper suppressed the build failure; failing CI.' >&2
             exit 1
@@ -141,7 +141,7 @@ jobs:
           find Apollo/Product -type f -name '*G965F*.img' -size +0c | grep .
           # Apollo cleans .config after a successful build; inspect the preserved log instead.
           grep -q 'G965F kernel build finished.' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
-          grep -q 'SELinux.*Enforcing' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
+          grep -q 'SELinux.*Permissive' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
 
       - name: Compile updated KernelSU Next candidate - SM-G965F
         id: candidate
@@ -153,7 +153,7 @@ jobs:
           export KSU_VERSION_OVERRIDE="$((30000 + ksu_count + 289))"
           export KSU_VERSION_TAG_OVERRIDE="legacy-$(git -C upstream rev-parse --short=12 HEAD)"
           cd candidate
-          printf '2\n4\n2\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/candidate-build.log
+          printf '2\n4\n1\ny\ny\n' | bash apollo.sh 2>&1 | tee ../audit/candidate-build.log
           if grep -q 'ERROR: G965F kernel compilation failed' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log; then
             echo 'The Apollo wrapper suppressed the build failure; failing CI.' >&2
             exit 1
@@ -161,7 +161,7 @@ jobs:
           find Apollo/Product -type f -name '*G965F*.img' -size +0c | grep .
           # Apollo cleans .config after a successful build; inspect the preserved log instead.
           grep -q 'G965F kernel build finished.' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
-          grep -q 'SELinux.*Enforcing' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
+          grep -q 'SELinux.*Permissive' ../audit/$(if [ "$PWD" = "$(realpath ../kernel)" ]; then echo baseline; else echo candidate; fi)-build.log
 
       - name: Upload experimental outputs
         if: always()
@@ -194,17 +194,17 @@ jobs:
           export BUILD_RUN_ID="${{ github.run_id }}"
           bash scripts/package_new_candidate.sh \
             template/EXPERIMENTAL-G965F-package-validation.zip \
-            "$candidate_image" "$PWD/UNVERIFIED-G965F-KSU33315-SUSFS230.zip"
-          sha256sum UNVERIFIED-G965F-KSU33315-SUSFS230.zip > SHA256SUMS.txt
-          unzip -p UNVERIFIED-G965F-KSU33315-SUSFS230.zip BUILD-NOTES.txt > BUILD-NOTES.txt
+            "$candidate_image" "$PWD/UNVERIFIED-G965F-KSU33315-SUSFS230-PERMISSIVE.zip"
+          sha256sum UNVERIFIED-G965F-KSU33315-SUSFS230-PERMISSIVE.zip > SHA256SUMS.txt
+          unzip -p UNVERIFIED-G965F-KSU33315-SUSFS230-PERMISSIVE.zip BUILD-NOTES.txt > BUILD-NOTES.txt
 
       - name: Upload experimental G965F combined kernel ZIP
         if: steps.candidate.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: UNVERIFIED-G965F-KSUNext-SUSFS23-TESTZIP
+          name: UNVERIFIED-G965F-KSUNext-SUSFS23-PERMISSIVE-TESTZIP
           path: |
-            UNVERIFIED-G965F-KSU33315-SUSFS230.zip
+            UNVERIFIED-G965F-KSU33315-SUSFS230-PERMISSIVE.zip
             SHA256SUMS.txt
             BUILD-NOTES.txt
           retention-days: 14

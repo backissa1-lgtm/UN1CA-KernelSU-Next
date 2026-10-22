@@ -9,6 +9,14 @@ import re,sys
 p=Path(sys.argv[1]);src=p.read_text()
 inc="#include <linux/susfs_def.h>"
 if src.count(inc)!=1:raise SystemExit("Expected SUSFS include once")
+# The original port includes this header only for SUS_MOUNT, but the
+# SUS_KSTAT inotify hook also calls its static inline UID predicate.
+# Without this guard expansion the no-mount Enforcing build fails with
+# an implicit declaration of susfs_is_current_app_uid().
+old_inc="#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\n#include <linux/susfs_def.h>\n#endif"
+new_inc="#if defined(CONFIG_KSU_SUSFS_SUS_MOUNT) || defined(CONFIG_KSU_SUSFS_SUS_KSTAT)\n#include <linux/susfs_def.h>\n#endif"
+if src.count(old_inc)!=1:raise SystemExit("Unexpected original SUSFS header guard")
+src=src.replace(old_inc,new_inc,1)
 decl="#if defined(CONFIG_PROC_FS)"
 add="""#ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 extern bool susfs_is_inode_sus_kstat(struct inode *inode, bool *out_is_fuse);

@@ -41,7 +41,7 @@ PY
 
 cat > "$tmp/repack/BUILD-NOTES.txt" <<EOF
 EXPERIMENTAL G965F KERNEL. NOT BOOT-TESTED ON DEVICE.
-SM-G965F/star2lte, UN1CA Android 16, EROFS, Enforcing.
+SM-G965F/star2lte, UN1CA Android 16, EROFS, Enforcing. Diagnostic build: SUSFS disabled.
 UN1CA source installer SHA256: $original_sha
 Verified derivative ZIP SHA256: $template_sha
 Only G965F-kernel patch changed; original G965F DTB retained.

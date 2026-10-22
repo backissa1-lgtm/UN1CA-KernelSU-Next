@@ -123,6 +123,13 @@ out_flags:
  return s
 
 def proc_fd(s):
+ # The original fdinfo source hid this include behind SUS_MOUNT, but its
+ # SUS_KSTAT path also calls susfs_is_current_app_uid(), defined in susfs_def.h.
+ # Keep the SUSFS header whenever the SUSFS core is enabled; without this,
+ # an enforcing, no-mount configuration fails with an implicit declaration.
+ s=one(s,"#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT\\n#include <linux/susfs_def.h>\\n#endif".replace("\\n","\n"),
+       "#ifdef CONFIG_KSU_SUSFS\\n#include <linux/susfs_def.h>\\n#endif".replace("\\n","\n"),
+       "proc fd SUSFS header")
  old="""#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
 \tstruct mount *mnt = NULL;
 #endif

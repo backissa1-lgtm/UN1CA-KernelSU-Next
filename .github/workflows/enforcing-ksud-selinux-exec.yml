@@ -57,8 +57,11 @@ jobs:
           python3 scripts/restore_susfs_bridges.py kernel/KernelSU-Next/kernel candidate/KernelSU-Next/kernel
           # Keep original UN1CA SUSFS v1.5.5 and validated KernelSU Next
           # integration. Repair only the missing userspace boot prerequisite.
-          python3 scripts/fix_ksud_bootstrap.py "$PWD/candidate/KernelSU-Next/kernel/runtime/ksud_integration.c"
-          python3 scripts/fix_ksud_bootstrap.py "$PWD/candidate/KernelSU-Next/kernel/runtime/ksud_integration.c" --verify
+          # Keep the already installed /data/adb/ksud (manager UAPI 6).
+          # The ROM's /system/bin/ksud is UAPI 4, so never overwrite
+          # a modern daemon with the older ROM payload at each reboot.
+          # Fix the proven init -> ksu SELinux EACCES only.
+          ! grep -q 'copy /system/bin/ksud /data/adb/ksud' candidate/KernelSU-Next/kernel/runtime/ksud_integration.c
           # Match init's nosuid bounded-exec exception to KernelSU Next domain.
           python3 scripts/fix_ksud_selinux_transition.py "$PWD/candidate/security/selinux/hooks.c"
           python3 scripts/fix_ksud_selinux_transition.py "$PWD/candidate/security/selinux/hooks.c" --verify

@@ -45,7 +45,10 @@ SM-G965F/star2lte, UN1CA Android 16, EROFS, Enforcing; SUSFS v1.5.5 preserved.
 UN1CA source installer SHA256: $original_sha
 Verified derivative ZIP SHA256: $template_sha
 Only G965F-kernel patch changed; original G965F DTB retained.
-Installer preserves current phone ramdisk.\nKSU init.rc now prepares /data/adb/ksud from /system/bin/ksud at post-fs-data.\nModule startup / boot / root access still require on-device validation.
+Installer preserves current phone ramdisk.
+SELinux Enforcing retained. Linux 4.9 init -> u:r:ksu:s0 bounded-exec exception corrected.
+Existing /data/adb/ksud preserved; do not replace it with the ROM's older UAPI 4 daemon.
+Experimental module execution fix; real-device module-update processing is not yet validated.
 Candidate boot image SHA256: $(sha256sum "$image" | awk '{print $1}')
 Candidate kernel Image SHA256: $(sha256sum "$tmp/kernel" | awk '{print $1}')
 Preserved G965F DTB SHA256: $(sha256sum "$tmp/original-G965F-dtb" | awk '{print $1}')

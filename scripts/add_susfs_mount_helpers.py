@@ -24,7 +24,12 @@ if s.count(target)!=1:
     raise SystemExit("mntns_operations insertion point changed")
 chunk="""};
 
-#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#if defined(CONFIG_KSU_SUSFS_SUS_MOUNT) || defined(CONFIG_KSU_SUSFS_SUS_KSTAT)
+/*
+ * KSTAT v2.3 needs the non-hidden mount lookup helpers even when
+ * SUS_MOUNT is disabled. Build helpers for either feature while keeping
+ * the user-facing mount-hiding hooks gated on SUS_MOUNT.
+ */
 /*
  * SUSFS 2.3 mount-ID and vfsmount lookup adapted to Samsung's
  * mount_lock seqlock and CONFIG_RKP_NS_PROT vfsmount representation.

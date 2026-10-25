@@ -13,6 +13,25 @@ while read -r name digest url; do
   [[ "$url" == https://github.com/*/releases/download/* || "$url" == https://raw.githubusercontent.com/* || "$url" == https://github.com/KernelSU-Next/KernelSU-Next/actions/runs/39297115788 ]]
 done < bootchain/assets.manifest
 python3 -m py_compile scripts/inject_bootchain_hook.py
+python3 -m py_compile scripts/fix_ksu_allowlist_persistence.py
+allowlist_test="$(mktemp)"
+trap 'rm -f "$allowlist_test"' EXIT
+cat > "$allowlist_test" <<'EOS'
+#include "compat/kernel_compat.h"
+static int demo(void) {
+  if (kernel_read(fp, &magic, sizeof(magic), &off) != sizeof(magic))
+    return -1;
+  if (kernel_read(fp, &version, sizeof(version), &off) != sizeof(version))
+    return -1;
+  ret = kernel_read(fp, &profile, app_profile_size, &off);
+  return ret;
+}
+EOS
+python3 scripts/fix_ksu_allowlist_persistence.py "$allowlist_test"
+python3 scripts/fix_ksu_allowlist_persistence.py --verify "$allowlist_test"
+! grep -Eq '(^|[^a-zA-Z_])kernel_read\(fp, &' "$allowlist_test"
+rm -f "$allowlist_test"
+
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT

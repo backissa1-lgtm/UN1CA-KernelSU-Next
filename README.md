@@ -36,3 +36,8 @@ one-click installation.
 
 Technical details, verification and rollback:
 [`bootchain/README.md`](bootchain/README.md).
+
+**Important all-in-one correction (Oct 25):** Stable manager v3.4.2
+build 33355 is UAPI 5, but this kernel requires UAPI 6. The revised
+branch pins upstream signed dev CI manager build 33405 and its exactly
+matching UAPI 6 daemon; old all-in-one ZIPs should not be reused.

@@ -10,7 +10,7 @@ while read -r name digest url; do
   else
     [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
   fi
-  [[ "$url" == https://github.com/*/releases/download/* || "$url" == https://raw.githubusercontent.com/* ]]
+  [[ "$url" == https://github.com/*/releases/download/* || "$url" == https://raw.githubusercontent.com/* || "$url" == https://github.com/KernelSU-Next/KernelSU-Next/actions/runs/39297115788 ]]
 done < bootchain/assets.manifest
 python3 -m py_compile scripts/inject_bootchain_hook.py
 

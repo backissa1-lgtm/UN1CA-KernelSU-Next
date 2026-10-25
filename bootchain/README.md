@@ -9,14 +9,15 @@ software stack worked on their phone after the repairs below. This new
 
 ## Exact official package versions (pinned SHA256)
 
-The GitHub workflow downloads and checks hashes against
-[`assets.manifest`](assets.manifest), then bundles all files into the
-kernel ZIP. No network access on the phone is needed during installation.
+The GitHub workflow downloads and verifies all four official release files
+by SHA-256 and the upstream KernelSU ARM64 BusyBox by its pinned Git blob ID
+([asset manifest](assets.manifest)); it bundles them into the kernel ZIP. No network access on the phone is needed during installation.
 
 - KernelSU Next **v3.4.2** standard manager
   (`KernelSU_Next_v3.4.2_33355-release.apk`, not spoofed)
 - KernelSU Next **v3.4.2** ARM64 `ksud-aarch64-linux-android`
   (compatible UAPI 6 required by this kernel)
+- Pinned upstream KernelSU Next **v3.4.2 ARM64 BusyBox** for fresh installs
 - NeoZygisk **v2.4 (289)** official release ZIP
 - Vector **v2.2 (3080)** official release ZIP
 
@@ -36,10 +37,10 @@ kernel ZIP. No network access on the phone is needed during installation.
 **The APK cannot be installed in recovery.** Android PackageManager is not
 running there. The KernelSU boot service performs this step later.
 
-**This is not a true no-data-required installer.** Recovery must have
-decrypted and writable `/data/adb`, and
-`/data/adb/ksu/bin/busybox` must exist to protect the compatible daemon on
-F2FS. If either prerequisite is missing, the kernel can still flash but
+**This is not a no-data-required installer.** Recovery must have decrypted
+and writable `/data/adb`. The ZIP provisions its pinned ARM64 BusyBox if
+the device does not have one already; this is used to protect the compatible
+daemon on F2FS. If `/data` is inaccessible, the kernel can still flash but
 automatic userspace setup will be skipped. The hook prints a message and
 recovery keeps `/tmp/g965f-bootchain-install.log` when staging is attempted.
 Do **not** assume modules installed from a successful kernel flash alone.
@@ -67,6 +68,10 @@ A clean/new phone without those prerequisites needs additional provisioning.
    BusyBox `unshare`, avoids starting a second `vectord`, and uses
    `--system-server-max-retry=0` (the configuration the user tested).
    Vector's working daemon reported v2.2 (3080) and API 102.
+
+If the ZIP is flashed from **running Android** rather than recovery, it
+stages files but defers destructive cache clearing; do not delete active
+ART caches while applications are running.
 
 ## Rollback, updates, diagnostics
 

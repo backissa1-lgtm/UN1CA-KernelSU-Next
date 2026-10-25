@@ -185,21 +185,45 @@ jobs:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: template
 
-      - name: Download pinned official KernelSU manager, daemon and Zygisk packages
+      - name: Download matching UAPI6 manager from official upstream CI
+        id: upstream-manager
+        uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: manager
+          repository: KernelSU-Next/KernelSU-Next
+          run-id: 39297115788
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: bootchain/downloads/upstream-manager
+
+      - name: Verify pinned manager and module archives
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p bootchain/downloads
+          mkdir -p bootchain/downloads/upstream-manager
+          if ! find bootchain/downloads/upstream-manager -name '*.apk' -size +0c | grep -q .; then
+            curl -fL --retry 4 --retry-all-errors \
+              'https://nightly.link/KernelSU-Next/KernelSU-Next/actions/runs/39297115788/manager.zip' \
+              -o "$RUNNER_TEMP/upstream-manager.zip"
+            unzip -q "$RUNNER_TEMP/upstream-manager.zip" -d bootchain/downloads/upstream-manager
+          fi
+          src="$(find bootchain/downloads/upstream-manager -type f -name '*.apk' -size +0c -print -quit)"
+          test -n "$src" && test -s "$src"
+          cp "$src" "bootchain/downloads/KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk"
+          unzip -p "bootchain/downloads/KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk" \
+            lib/arm64-v8a/libksud.so > bootchain/downloads/ksud-aarch64-linux-android
+          python3 scripts/verify_ksunext_apk.py "bootchain/downloads/KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk"
           while read -r name digest url; do
             case "$name" in ""|\#*) continue;; esac
             case "$name" in
-              KernelSU_Next_v3.4.2_33355-release.apk|ksud-aarch64-linux-android|NeoZygisk-v2.4-289-release.zip|Vector-v2.2-3080-Release.zip|busybox-aarch64) ;;
-              *) echo "Unexpected dependency: $name" >&2; exit 1 ;;
+              KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk|ksud-aarch64-linux-android) ;;
+              NeoZygisk-v2.4-289-release.zip|Vector-v2.2-3080-Release.zip|busybox-aarch64)
+                curl --http1.1 -fL --retry 6 --retry-all-errors --retry-delay 4 \
+                  --connect-timeout 30 "$url" -o "bootchain/downloads/$name"
+                ;;
+              *) echo "Unexpected asset: $name" >&2; exit 1 ;;
             esac
-            curl --http1.1 -fL --retry 6 --retry-all-errors --retry-delay 4 \
-              --connect-timeout 30 "$url" -o "bootchain/downloads/$name"
             if [ "$name" = busybox-aarch64 ]; then
-              # Match exact Git blob from upstream tag v3.4.2 (content SHA-1).
               got="$( { printf 'blob %s\0' "$(stat -c%s "bootchain/downloads/$name")"; cat "bootchain/downloads/$name"; } | sha1sum | awk '{print $1}')"
               test "$got" = "$digest"
             else
@@ -209,7 +233,6 @@ jobs:
           test "$(find bootchain/downloads -maxdepth 1 -type f | wc -l)" -eq 5
           unzip -t bootchain/downloads/NeoZygisk-v2.4-289-release.zip >/dev/null
           unzip -t bootchain/downloads/Vector-v2.2-3080-Release.zip >/dev/null
-
       - name: Package combined kernel with proven UN1CA DTB
         if: steps.candidate.outcome == 'success'
         shell: bash

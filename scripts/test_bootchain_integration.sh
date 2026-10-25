@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
-bash -n bootchain/apply.sh
+bash -n bootchain/apply.sh bootchain/recovery-stage.sh bootchain/first-boot.sh
+# Ensure the exact release set is pinned and passes manifest schema checks.
+test "$(grep -cv '^#' bootchain/assets.manifest)" -eq 4
+while read -r name digest url; do
+  case "$name" in ''|\#*) continue;; esac
+  [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
+  [[ "$url" == https://github.com/*/releases/download/* ]]
+done < bootchain/assets.manifest
 python3 -m py_compile scripts/inject_bootchain_hook.py
 
 tmp="$(mktemp -d)"

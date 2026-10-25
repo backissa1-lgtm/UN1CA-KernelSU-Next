@@ -19,7 +19,7 @@ umask 022
 # Check all four official release digests before any change to boot services.
 unzip -p "$ZIP" bootchain/assets.manifest > "$STAGE/assets.manifest" ||
   fail "cannot read official hashes"
-for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip busybox-aarch64; do
+for name in KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip busybox-aarch64; do
   digest="$(awk -v n="$name" '$1 == n { print $2 }' "$STAGE/assets.manifest")"
   [ -n "$digest" ] || fail "no checksum for $name"
   unzip -p "$ZIP" "bootchain/assets/$name" > "$STAGE/assets/$name.tmp" ||

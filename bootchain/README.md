@@ -1,107 +1,113 @@
-# G965F confirmed-working boot chain (UN1CA Android 16 / One UI 8)
+# G965F all-in-one KernelSU Next + NeoZygisk + Vector
 
-This side branch starts at the G965F kernel build whose **kernel booted** and whose
-KernelSU/NeoZygisk/Vector stack was subsequently repaired successfully on-device
-(October 25, 2026). The integrated **recovery installer hook is new and not yet
-flash-tested**, so the ZIP is not a verified one-step recovery installer until
-its behavior is checked on the phone.
+Target: Samsung Galaxy S9+ **SM-G965F**, UN1CA Android 16 / One UI 8,
+KernelSU Next, SUSFS 1.5.5, SELinux Enforcing.
 
-## What went wrong and what this branch captures
+The **kernel itself** was boot-tested. The user confirmed the following
+software stack worked on their phone after the repairs below. This new
+**combined recovery + first-boot automatic installer is NOT yet flash-tested**.
 
-1. **KernelSU daemon UAPI mismatch.** The UN1CA read-only EROFS
-   `/system/etc/init/unica_ksunext_installer.rc` performs
-   `copy /system/bin/ksud /data/adb/ksud` on `post-fs-data`. Its
-   `/system/bin/ksud` is v3.4.0 **UAPI 4**; the working kernel expects
-   **UAPI 6**. This caused `UAPI version mismatch: kernel=6, ksud=4;
-   skip on_services`. Once the UAPI 6 daemon was protected on F2FS with
-   `busybox chattr +i /data/adb/ksud`, KernelSU's services ran.
-   The on-device tested daemon was `ksud 3.4.2-50-gb427a3f9 (uapi: 6)`.
-2. **Vector's `unshare`.** Android's bundled `unshare` did not accept
-   `--propagation slave`; using `/data/adb/ksu/bin/busybox unshare`
-   allowed its daemon to start. We retained the tested no-restart diagnostic
-   service (`--system-server-max-retry=0`) and duplicate-daemon guard.
-3. **NeoZygisk repeated post-fs-data.** KernelSU/UN1CA ran
-   `post-fs-data.sh` multiple times. The upstream NeoZygisk 2.4
-   `post-fs-data.sh` deletes `/data/adb/neozygisk` before recreating it.
-   Three monitors remained running, but later applications reported
-   `GetProcessFlags/ReadModules failed with 2` because `cp64.sock`
-   had been unlinked. A `pidof zygisk-ptrace64` / `pidof zygisk-ptrace32`
-   guard now skips repeat initialization. After reboot there was one monitor,
-   one daemon, `cp64.sock` existed, and the errors disappeared.
-4. **Vector.** Its daemon and CLI started, NeoZygisk status showed
-   `zygote64: injected`, `daemon64: running`,
-   `Modules (1): zygisk_vector`, and the user confirmed Vector worked.
+## Exact official package versions (pinned SHA256)
 
-## How it is installed
+The GitHub workflow downloads and checks hashes against
+[`assets.manifest`](assets.manifest), then bundles all files into the
+kernel ZIP. No network access on the phone is needed during installation.
 
-`scripts/package_new_candidate.sh` bundles `bootchain/apply.sh` into the
-G965F ZIP and patches **only the G965F branch** of the existing
-`META-INF/com/google/android/update-binary` with a hook that runs **after
-the original installer exits successfully**. It preserves the original
-installer's exit status. The packaging step refuses an unexpected installer
-layout or an existing EXIT trap rather than guessing.
+- KernelSU Next **v3.4.2** standard manager
+  (`KernelSU_Next_v3.4.2_33355-release.apk`, not spoofed)
+- KernelSU Next **v3.4.2** ARM64 `ksud-aarch64-linux-android`
+  (compatible UAPI 6 required by this kernel)
+- NeoZygisk **v2.4 (289)** official release ZIP
+- Vector **v2.2 (3080)** official release ZIP
 
-The hook automatically runs the helper **if `/data/adb/modules` is accessible
-during the flash**. If recovery cannot decrypt `/data`, the kernel can still
-flash, but the userland fixes are **not** applied. On the first rooted boot,
-run the helper manually after extracting it from the flashed ZIP, for example:
+## Requested installation order
 
-```sh
-su
-unzip -p /sdcard/Download/G965F-kernel.zip bootchain/apply.sh > /data/local/tmp/g965f-apply.sh
-sh /data/local/tmp/g965f-apply.sh
-reboot
-```
+| Phase | Action |
+| --- | --- |
+| Recovery | 1. Flash validated SM-G965F kernel / preserve UN1CA DTB |
+| Recovery, if `/data` is decrypted | 2. Clear cache, Dalvik and ART compiled-code caches only |
+| Recovery, if `/data` is decrypted | 3. Stage official manager APK, compatible daemon, and both module ZIPs |
+| Recovery, if `/data` is decrypted | 4. Protect UAPI 6 `/data/adb/ksud` against UN1CA's UAPI 4 copy; install one-shot bootstrap module |
+| First Android boot | 5. Wait for Android PackageManager and install KernelSU Next 3.4.2 manager with `pm install -r` |
+| First Android boot | 6. Install NeoZygisk v2.4 and Vector v2.2 through `ksud module install` |
+| First Android boot | 7. Apply NeoZygisk and Vector startup fixes to both active and pending modules |
+| Automatic reboot | 8. Reboot once to activate Zygisk and Vector |
 
-Replace `G965F-kernel.zip` with the actual ZIP file name. If Android's
-`unzip` is unavailable, use `/data/adb/ksu/bin/busybox unzip -p`.
-The helper is safe to rerun, checks for root and UAPI 6, backs up replaced
-scripts, does not change SELinux mode, and **does not** bundle or download a
-KernelSU binary. You must have a compatible UAPI 6 `ksud` already available
-at `/data/adb/ksud` or `/data/adb/ksud.uapi6`; otherwise the helper stops
-without substituting the older ROM daemon.
+**The APK cannot be installed in recovery.** Android PackageManager is not
+running there. The KernelSU boot service performs this step later.
 
-Existing installed module scripts receive backups:
+**This is not a true no-data-required installer.** Recovery must have
+decrypted and writable `/data/adb`, and
+`/data/adb/ksu/bin/busybox` must exist to protect the compatible daemon on
+F2FS. If either prerequisite is missing, the kernel can still flash but
+automatic userspace setup will be skipped. The hook prints a message and
+recovery keeps `/tmp/g965f-bootchain-install.log` when staging is attempted.
+Do **not** assume modules installed from a successful kernel flash alone.
+A clean/new phone without those prerequisites needs additional provisioning.
 
-- `/data/adb/modules/zygisk_vector/service.sh.before-bootchain-auto`
-- `/data/adb/modules/zygisksu/post-fs-data.sh.before-bootchain-auto`
+## Confirmed working on-device repairs
 
-Updates or reinstallations of NeoZygisk or Vector can overwrite the patches:
-rerun `apply.sh` afterward and reboot.
+1. **UAPI 4 vs UAPI 6:** UN1CA
+   `/system/etc/init/unica_ksunext_installer.rc` executes
+   `copy /system/bin/ksud /data/adb/ksud` during post-fs-data.
+   UN1CA's UAPI 4 daemon prevents KernelSU services from running against
+   the UAPI 6 kernel. The user preserved a working UAPI 6 daemon and used
+   F2FS `busybox chattr +i` to prevent overwrite. The original successful
+   on-device daemon was `ksud 3.4.2-50-gb427a3f9 (uapi: 6)`. The
+   official v3.4.2 release is bundled as a fallback on newly provisioned
+   devices, and the running version must be verified after boot.
+2. **NeoZygisk double initialization:** repeated calls to
+   `post-fs-data.sh` deleted `/data/adb/neozygisk/cp64.sock` while
+   `zygiskd64` remained running. Three monitors accumulated.
+   The guard in `bootchain/apply.sh` skips duplicate calls if the
+   `zygisk-ptrace64` or 32-bit monitor already exists. One monitor
+   remained after reboot, the socket existed and the errors disappeared.
+3. **Vector launch:** Android `unshare` does not support
+   `--propagation slave`. The repaired `service.sh` uses KernelSU
+   BusyBox `unshare`, avoids starting a second `vectord`, and uses
+   `--system-server-max-retry=0` (the configuration the user tested).
+   Vector's working daemon reported v2.2 (3080) and API 102.
 
-## Important KernelSU upgrade procedure
+## Rollback, updates, diagnostics
 
-Immutable protection is deliberately strict. Before any KernelSU **userspace
-daemon** update, run:
+`bootchain/recovery-stage.sh`: only for post-flash recovery with decrypted
+`/data`. `bootchain/first-boot.sh`: run by the one-shot
+`g965f_bootchain_setup` KernelSU module when Android finishes booting.
+`bootchain/apply.sh`: repeatable startup patches for NeoZygisk and Vector,
+including `/data/adb/modules_update` before the second reboot.
 
-```sh
-su
-/data/adb/ksu/bin/busybox chattr -i /data/adb/ksud
-```
+Check staged progress in
+`/data/adb/g965f-bootchain/setup.log`. The marker
+`/data/adb/g965f-bootchain/setup.done` is written only once the manager,
+modules, and patches have succeeded. If setup fails, the module tries again
+at the next normal boot; it does not erase app data.
 
-Upgrade to a daemon compatible with the kernel (currently UAPI 6), rerun
-`apply.sh` to back it up and restore protection, then reboot. Do not
-reinstall the ROM's UAPI 4 `/system/bin/ksud`.
-
-## Undo manually
-
-Unlock `ksud` with `chattr -i`; copy back the backed-up Vector and
-NeoZygisk scripts (using `cp -p`), and reboot. The helper does not modify
-the ROM's read-only init RC file, the kernel's Enforcing configuration,
-NeoZygisk binaries, or the SUSFS driver.
-
-## Validation after boot
+Check the results:
 
 ```sh
 su
+cat /data/adb/g965f-bootchain/setup.log
 /data/adb/ksud --version
 /data/adb/ksu/bin/busybox lsattr /data/adb/ksud
 cat /data/adb/neozygisk/module.prop
 ls -l /data/adb/neozygisk/cp64.sock
 ps -A | grep -E 'zygisk-ptrace64|zygiskd64|vectord'
 sh /data/adb/modules/zygisk_vector/cli status
-logcat -d -b all | grep -Ei 'UAPI version mismatch|GetProcessFlags failed|ReadModules failed' | tail
 ```
 
-No boot loop, SELinux mode change, kernel swap, root reinstallation, or
-attempted `/metadata` remount is required for this helper.
+**Before any future KernelSU daemon update, remove immutable protection:**
+
+```sh
+su
+/data/adb/ksu/bin/busybox chattr -i /data/adb/ksud
+```
+
+Then update the UAPI 6-compatible manager/daemon, re-run
+`bootchain/apply.sh` and reboot. Updates of NeoZygisk or Vector may
+overwrite their startup fixes; re-run the helper after any module update.
+
+Backups of patched module files are named
+`post-fs-data.sh.before-bootchain-auto` and
+`service.sh.before-bootchain-auto` inside the affected module directory.
+`bootchain/apply.sh` does not disable SELinux, change SUSFS, wipe
+applications, or modify the ROM's read-only system partition.

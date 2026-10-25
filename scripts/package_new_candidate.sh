@@ -28,7 +28,7 @@ install -D -m 0755 "$root/bootchain/apply.sh" "$tmp/repack/bootchain/apply.sh"
 install -D -m 0755 "$root/bootchain/recovery-stage.sh" "$tmp/repack/bootchain/recovery-stage.sh"
 install -D -m 0755 "$root/bootchain/first-boot.sh" "$tmp/repack/bootchain/first-boot.sh"
 install -D -m 0644 "$root/bootchain/assets.manifest" "$tmp/repack/bootchain/assets.manifest"
-for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip busybox-aarch64; do
+for name in KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip busybox-aarch64; do
   test -s "$root/bootchain/downloads/$name"
   install -D -m 0644 "$root/bootchain/downloads/$name" "$tmp/repack/bootchain/assets/$name"
 done

@@ -193,14 +193,20 @@ jobs:
           while read -r name digest url; do
             case "$name" in ""|\#*) continue;; esac
             case "$name" in
-              KernelSU_Next_v3.4.2_33355-release.apk|ksud-aarch64-linux-android|NeoZygisk-v2.4-289-release.zip|Vector-v2.2-3080-Release.zip) ;;
+              KernelSU_Next_v3.4.2_33355-release.apk|ksud-aarch64-linux-android|NeoZygisk-v2.4-289-release.zip|Vector-v2.2-3080-Release.zip|busybox-aarch64) ;;
               *) echo "Unexpected dependency: $name" >&2; exit 1 ;;
             esac
             curl --http1.1 -fL --retry 6 --retry-all-errors --retry-delay 4 \
               --connect-timeout 30 "$url" -o "bootchain/downloads/$name"
-            echo "$digest  bootchain/downloads/$name" | sha256sum -c -
+            if [ "$name" = busybox-aarch64 ]; then
+              # Match exact Git blob from upstream tag v3.4.2 (content SHA-1).
+              got="$( { printf 'blob %s\\0' "$(stat -c%s "bootchain/downloads/$name")"; cat "bootchain/downloads/$name"; } | sha1sum | awk '{print $1}')"
+              test "$got" = "$digest"
+            else
+              echo "$digest  bootchain/downloads/$name" | sha256sum -c -
+            fi
           done < bootchain/assets.manifest
-          test "$(find bootchain/downloads -maxdepth 1 -type f | wc -l)" -eq 4
+          test "$(find bootchain/downloads -maxdepth 1 -type f | wc -l)" -eq 5
           unzip -t bootchain/downloads/NeoZygisk-v2.4-289-release.zip >/dev/null
           unzip -t bootchain/downloads/Vector-v2.2-3080-Release.zip >/dev/null
 

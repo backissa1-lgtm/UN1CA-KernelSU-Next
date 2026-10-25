@@ -45,9 +45,16 @@ echo "$ver" | grep -q 'uapi: 6' || fail "daemon is not UAPI 6"
 say "installing official KernelSU Next 3.4.2 manager"
 apk="$ASSETS/KernelSU_Next_v3.4.2_33355-release.apk"
 [ -f "$apk" ] || fail "manager APK missing"
+# PackageManager's shell process may not be able to traverse /data/adb.
+# Copy the verified APK into /data/local/tmp with shell-readable permissions.
+tmpapk=/data/local/tmp/G965F-KernelSU-Next-3.4.2.apk
+cp -p "$apk" "$tmpapk" || fail "cannot stage manager for PackageManager"
+chmod 0644 "$tmpapk" || fail "cannot set manager APK permissions"
+chcon u:object_r:shell_data_file:s0 "$tmpapk" 2>/dev/null || :
 # -r updates the existing trusted package; Android verifies the APK signature.
 # Do not uninstall an existing manager or bypass signature checks.
-pm install -r "$apk" || fail "PackageManager rejected manager APK"
+pm install -r "$tmpapk" || fail "PackageManager rejected manager APK"
+rm -f "$tmpapk" 2>/dev/null || :
 pm path com.rifsxd.ksunext >/dev/null 2>&1 ||
   fail "KernelSU Next manager package was not installed"
 say "manager APK verified installed"

@@ -33,17 +33,17 @@ g965f_bootchain_on_exit() {
     trap - 0
     if [ "$g965f_installer_status" -eq 0 ]; then
         if [ -d /data/adb/modules ] && [ -n "$G965F_BOOTCHAIN_ZIP" ]; then
-            if unzip -p "$G965F_BOOTCHAIN_ZIP" bootchain/apply.sh > /tmp/g965f-bootchain-apply.sh; then
+            if unzip -p "$G965F_BOOTCHAIN_ZIP" bootchain/recovery-stage.sh > /tmp/g965f-bootchain-apply.sh; then
                 echo "G965F boot-chain: applying on-device fixes"
-                sh /tmp/g965f-bootchain-apply.sh \
+                sh /tmp/g965f-bootchain-apply.sh "$G965F_BOOTCHAIN_ZIP" \
                     > /tmp/g965f-bootchain-install.log 2>&1 ||
-                    echo "G965F boot-chain: auto-fix incomplete; run bootchain/apply.sh after boot"
+                    echo "G965F boot-chain: recovery staging incomplete; see /tmp/g965f-bootchain-install.log"
                 cat /tmp/g965f-bootchain-install.log 2>/dev/null || :
             else
-                echo "G965F boot-chain: cannot extract helper; run after boot"
+                echo "G965F boot-chain: cannot extract recovery stage"
             fi
         else
-            echo "G965F boot-chain: /data/adb unavailable in recovery; run helper after first boot"
+            echo "G965F boot-chain: /data/adb unavailable; first-boot auto-install is not staged"
         fi
     fi
     exit "$g965f_installer_status"

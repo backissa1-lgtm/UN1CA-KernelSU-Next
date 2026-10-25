@@ -42,8 +42,8 @@ ver="$("$KSU" --version 2>&1)"
 say "$ver"
 echo "$ver" | grep -q 'uapi: 6' || fail "daemon is not UAPI 6"
 
-say "installing official KernelSU Next 3.4.2 manager"
-apk="$ASSETS/KernelSU_Next_v3.4.2_33355-release.apk"
+say "installing official signed KernelSU Next UAPI6 dev manager 33405"
+apk="$ASSETS/KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk"
 [ -f "$apk" ] || fail "manager APK missing"
 # PackageManager's shell process may not be able to traverse /data/adb.
 # Copy the verified APK into /data/local/tmp with shell-readable permissions.

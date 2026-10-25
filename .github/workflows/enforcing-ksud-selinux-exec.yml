@@ -200,7 +200,7 @@ jobs:
               --connect-timeout 30 "$url" -o "bootchain/downloads/$name"
             if [ "$name" = busybox-aarch64 ]; then
               # Match exact Git blob from upstream tag v3.4.2 (content SHA-1).
-              got="$( { printf 'blob %s\\0' "$(stat -c%s "bootchain/downloads/$name")"; cat "bootchain/downloads/$name"; } | sha1sum | awk '{print $1}')"
+              got="$( { printf 'blob %s\0' "$(stat -c%s "bootchain/downloads/$name")"; cat "bootchain/downloads/$name"; } | sha1sum | awk '{print $1}')"
               test "$got" = "$digest"
             else
               echo "$digest  bootchain/downloads/$name" | sha256sum -c -

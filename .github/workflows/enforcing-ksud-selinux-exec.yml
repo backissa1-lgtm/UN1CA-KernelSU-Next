@@ -57,6 +57,11 @@ jobs:
           python3 scripts/fix_ksu_selinux.py candidate/KernelSU-Next/kernel/selinux/rules.c
           python3 scripts/port_ksu_feature_init.py candidate/KernelSU-Next/kernel/core/init.c
           python3 scripts/fix_ksu_symbol_lookup.py candidate/KernelSU-Next/kernel/supercall/dispatch.c
+          # Linux 4.9's kernel_read ABI differs from 4.14+. The upstream
+          # KernelSU loader used the modern ABI in all three allowlist reads.
+          python3 scripts/fix_ksu_allowlist_persistence.py candidate/KernelSU-Next/kernel/policy/allowlist.c
+          python3 scripts/fix_ksu_allowlist_persistence.py --verify candidate/KernelSU-Next/kernel/policy/allowlist.c
+          grep -Fq 'ksu_kernel_read_compat(fp, &magic, sizeof(magic), &off)' candidate/KernelSU-Next/kernel/policy/allowlist.c
           python3 scripts/restore_susfs_bridges.py kernel/KernelSU-Next/kernel candidate/KernelSU-Next/kernel
           # Keep original UN1CA SUSFS v1.5.5 and validated KernelSU Next
           # integration. Repair only the missing userspace boot prerequisite.

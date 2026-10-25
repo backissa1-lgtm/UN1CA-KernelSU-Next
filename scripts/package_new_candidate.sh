@@ -21,6 +21,13 @@ test -s "$tmp/repack/floyd/G960F-kernel"
 test -s "$tmp/repack/floyd/G965F-kernel"
 test -s "$tmp/repack/floyd/G960F-dtb"
 test -s "$tmp/repack/floyd/G965F-dtb"
+# Carry the tested root/zygisk/vector startup repairs with the kernel ZIP.
+# The existing recovery installer is left intact except for a G965F-only
+# success hook, which runs the helper only if decrypted /data is accessible.
+install -D -m 0755 "$root/bootchain/apply.sh" "$tmp/repack/bootchain/apply.sh"
+python3 "$root/scripts/inject_bootchain_hook.py" \
+  "$tmp/repack/META-INF/com/google/android/update-binary"
+grep -q 'G965F_BOOTCHAIN_INTEGRATION_V1' "$tmp/repack/META-INF/com/google/android/update-binary"
 python3 "$root/scripts/extract_android_boot_v0.py" \
   "$image" "$tmp/kernel" "$tmp/candidate-dtb" > "$tmp/kernel-metadata.json"
 
@@ -47,8 +54,19 @@ Verified derivative ZIP SHA256: $template_sha
 Only G965F-kernel patch changed; original G965F DTB retained.
 Installer preserves current phone ramdisk.
 SELinux Enforcing retained. Linux 4.9 init -> u:r:ksu:s0 bounded-exec exception corrected.
-Existing /data/adb/ksud preserved; do not replace it with the ROM's older UAPI 4 daemon.
-Experimental module execution fix; real-device module-update processing is not yet validated.
+G965F boot-chain post-flash helper included: bootchain/apply.sh.
+On successful recovery flash, it runs automatically ONLY if /data/adb/modules
+is accessible (recovery has decrypted /data). Otherwise run after first boot:
+  su -c 'sh /path/to/extracted/bootchain/apply.sh'
+The helper preserves the verified UAPI 6 /data/adb/ksud, protects it using
+F2FS immutable (remove before future KernelSU userspace upgrades), patches
+NeoZygisk post-fs-data.sh against repeated monitor/socket destruction, and
+patches Vector service.sh to use BusyBox unshare without force-restarting
+system_server. Every edited module script gets a backup, and the helper
+is idempotent. It does NOT bundle a ksud binary or create /metadata mounts.
+If UAPI 6 ksud is absent, install a compatible manager/daemon first.
+Only the kernel itself is known to have booted on the target. The newly
+integrated recovery hook is not yet flash-tested. Inspect installation logs.
 Candidate boot image SHA256: $(sha256sum "$image" | awk '{print $1}')
 Candidate kernel Image SHA256: $(sha256sum "$tmp/kernel" | awk '{print $1}')
 Preserved G965F DTB SHA256: $(sha256sum "$tmp/original-G965F-dtb" | awk '{print $1}')

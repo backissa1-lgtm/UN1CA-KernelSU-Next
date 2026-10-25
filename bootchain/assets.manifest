@@ -1,0 +1,6 @@
+# Verified official upstream assets. GitHub release files are SHA256 pinned.
+# Format: filename | SHA256 | URL (single spaces are used as separators).
+KernelSU_Next_v3.4.2_33355-release.apk 774a5511f7034a4930e881114e202319cbdc34c5aaaa5c7c6b6d2902364e4c58 https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.4.2/KernelSU_Next_v3.4.2_33355-release.apk
+ksud-aarch64-linux-android 2771a2ae989b522b5d70f3288ad5a2f379488962d09c1fe11e13a745eba89362 https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.4.2/ksud-aarch64-linux-android
+NeoZygisk-v2.4-289-release.zip 93a1425c67bb89f58a0dcb9fc823ec93f6472214f221e667a70b67c6a6e061a1 https://github.com/JingMatrix/NeoZygisk/releases/download/v2.4/NeoZygisk-v2.4-289-release.zip
+Vector-v2.2-3080-Release.zip 9ee8323575d615f7b3f1076ff60b2a63a49390ef11881b52632311a37f6f79cc https://github.com/JingMatrix/Vector/releases/download/v2.2/Vector-v2.2-3080-Release.zip

@@ -1,7 +1,7 @@
 name: Enforcing KernelSU Next + SUSFS 1.5.5 with init-ksud SELinux transition fix G965F
 on:
   push:
-    branches: [fix-modules-selinux-exec]
+    branches: [fix-modules-selinux-exec, g965f-working-bootchain-auto-fixes]
   workflow_dispatch:
 
 permissions:
@@ -14,6 +14,46 @@ jobs:
     timeout-minutes: 350
     steps:
       - uses: actions/checkout@v4
+      - name: Validate G965F boot-chain setup and recovery hook
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n bootchain/apply.sh
+          python3 -m py_compile scripts/inject_bootchain_hook.py
+          tmp="$(mktemp -d)"
+          trap 'rm -rf "$tmp"' EXIT
+          cat > "$tmp/update-binary" <<'EOS'
+          #!/system/bin/sh
+          device=G965F
+          if echo $device | grep 'G965F'; then
+              echo "Kernel installed"
+          fi
+          EOS
+          python3 scripts/inject_bootchain_hook.py "$tmp/update-binary"
+          bash -n "$tmp/update-binary"
+          grep -q 'G965F_BOOTCHAIN_INTEGRATION_V1' "$tmp/update-binary"
+          grep -q "g965f_bootchain_on_exit" "$tmp/update-binary"
+          # A second injection must fail rather than install two EXIT hooks.
+          if python3 scripts/inject_bootchain_hook.py "$tmp/update-binary"; then
+            echo 'Duplicate hook unexpectedly accepted' >&2
+            exit 1
+          fi
+          cat > "$tmp/not-our-installer" <<'EOS'
+          #!/system/bin/sh
+          echo "Unexpected installer"
+          EOS
+          if python3 scripts/inject_bootchain_hook.py "$tmp/not-our-installer"; then
+            echo 'Unexpected installer layout accepted' >&2
+            exit 1
+          fi
+          # Exit code of the original installer must be preserved.
+          sed -i 's/echo "Kernel installed"/exit 19/' "$tmp/update-binary"
+          if sh "$tmp/update-binary" unused unused /tmp/fake.zip; then
+            echo 'Installer failure was masked by boot-chain hook' >&2
+            exit 1
+          else
+            test "$?" -eq 19
+          fi
 
       - name: Download pinned kernel and KernelSU Next legacy driver
         shell: bash
@@ -192,21 +232,21 @@ jobs:
           export BUILD_RUN_ID="${{ github.run_id }}"
           bash scripts/package_new_candidate.sh \
             template/EXPERIMENTAL-G965F-package-validation.zip \
-            "$candidate_image" "$PWD/UNVERIFIED-G965F-KSU33315-SUSFS155-KSUD-SELINUX-FIX.zip"
-          sha256sum UNVERIFIED-G965F-KSU33315-SUSFS155-KSUD-SELINUX-FIX.zip > SHA256SUMS.txt
-          unzip -p UNVERIFIED-G965F-KSU33315-SUSFS155-KSUD-SELINUX-FIX.zip BUILD-NOTES.txt > BUILD-NOTES.txt
+            "$candidate_image" "$PWD/UNVERIFIED-G965F-KSU33315-SUSFS155-AUTO-BOOTCHAIN.zip"
+          sha256sum UNVERIFIED-G965F-KSU33315-SUSFS155-AUTO-BOOTCHAIN.zip > SHA256SUMS.txt
+          unzip -p UNVERIFIED-G965F-KSU33315-SUSFS155-AUTO-BOOTCHAIN.zip BUILD-NOTES.txt > BUILD-NOTES.txt
 
       - name: Upload experimental G965F combined kernel ZIP
         if: steps.candidate.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
-          name: UNVERIFIED-G965F-KSUNext-SUSFS155-SELINUX-EXEC-FIX-TESTZIP
+          name: UNVERIFIED-G965F-KSUNext-SUSFS155-AUTO-BOOTCHAIN-TESTZIP
           path: |
-            UNVERIFIED-G965F-KSU33315-SUSFS155-KSUD-SELINUX-FIX.zip
+            UNVERIFIED-G965F-KSU33315-SUSFS155-AUTO-BOOTCHAIN.zip
             SHA256SUMS.txt
             BUILD-NOTES.txt
           retention-days: 14
           if-no-files-found: error
       - name: Record status
         if: always()
-        run: echo 'Experimental compilation only; no successful boot or SUSFS runtime verification is implied.' >> "$GITHUB_STEP_SUMMARY"
+        run: echo 'Experimental build: kernel previously booted, NEW recovery installer hook untested.' >> "$GITHUB_STEP_SUMMARY"

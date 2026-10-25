@@ -76,19 +76,30 @@ cat > "$MOD/service.sh" <<'EOF'
 #!/system/bin/sh
 STAGE=/data/adb/g965f-bootchain
 [ -f "$STAGE/setup.done" ] && exit 0
-( sh "$STAGE/first-boot.sh" >> "$STAGE/setup.log" 2>&1 ) &
+# Do not keep the boot service's init process group: init kills it
+# after ksud services exits. A new session survives until Android boot completes.
+BB=/data/adb/ksu/bin/busybox
+if [ -x "$BB" ]; then
+  "$BB" setsid /system/bin/sh "$STAGE/first-boot.sh" >> "$STAGE/setup.log" 2>&1 </dev/null &
+else
+  /system/bin/sh "$STAGE/first-boot.sh" >> "$STAGE/setup.log" 2>&1 </dev/null &
+fi
 EOF
 chmod 0755 "$MOD/service.sh"
 touch "$MOD/skip_mount"
 
 # Rebuildable cache only: do not erase app data or entire ART data directory.
-say "wiping cache, Dalvik and ART compiled-code caches"
-if [ -d /cache ] && [ ! -L /cache ]; then
-  find /cache -mindepth 1 -maxdepth 1 -exec rm -rf '{}' \; 2>/dev/null || :
+if [ "$(getprop sys.boot_completed 2>/dev/null)" = 1 ]; then
+  say "Android is running: deferring cache wipe to offline recovery"
+else
+  say "wiping cache, Dalvik and ART compiled-code caches"
+  if [ -d /cache ] && [ ! -L /cache ]; then
+    find /cache -mindepth 1 -maxdepth 1 -exec rm -rf '{}' \; 2>/dev/null || :
+  fi
+  for dir in /data/dalvik-cache /data/resource-cache /data/misc/apexdata/com.android.art/dalvik-cache; do
+    [ -d "$dir" ] && [ ! -L "$dir" ] && rm -rf "$dir" 2>/dev/null || :
+  done
 fi
-for dir in /data/dalvik-cache /data/resource-cache /data/misc/apexdata/com.android.art/dalvik-cache; do
-  [ -d "$dir" ] && [ ! -L "$dir" ] && rm -rf "$dir" 2>/dev/null || :
-done
 sync
 say "Recovery preparation complete; Android first-boot setup pending"
 exit 0

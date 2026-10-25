@@ -212,4 +212,5 @@ jobs:
           if-no-files-found: error
       - name: Record status
         if: always()
-        run: echo 'Experimental build: kernel previously booted, NEW recovery installer hook untested.' >> "$GITHUB_STEP_SUMMARY"
+        run: |
+          echo 'Experimental build; kernel previously booted, NEW recovery installer hook untested.' >> "$GITHUB_STEP_SUMMARY"

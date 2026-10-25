@@ -14,7 +14,7 @@ by SHA-256 and the upstream KernelSU ARM64 BusyBox by its pinned Git blob ID
 ([asset manifest](assets.manifest)); it bundles them into the kernel ZIP. No network access on the phone is needed during installation.
 
 - KernelSU Next **v3.4.2** standard manager
-  (`KernelSU_Next_v3.4.2_33355-release.apk`, not spoofed)
+  (`KernelSU_Next_v3.4.2-50-gb427a3f9_33405-release.apk`, not spoofed)
 - KernelSU Next **v3.4.2** ARM64 `ksud-aarch64-linux-android`
   (compatible UAPI 6 required by this kernel)
 - Pinned upstream KernelSU Next **v3.4.2 ARM64 BusyBox** for fresh installs
@@ -116,3 +116,20 @@ Backups of patched module files are named
 `service.sh.before-bootchain-auto` inside the affected module directory.
 `bootchain/apply.sh` does not disable SELinux, change SUSFS, wipe
 applications, or modify the ROM's read-only system partition.
+
+## Corrected manager/daemon UAPI (October 25, 2026)
+
+The initial all-in-one ZIP contained stable KernelSU Next v3.4.2 build
+33355, compiled with **manager UAPI 5**, and its standalone daemon, also
+**UAPI 5**. Our custom kernel is **UAPI 6**. The first phone flash
+booted, but the manager warned it needs UAPI 6.
+
+The corrected all-in-one package pins the **official upstream development
+CI build 33405, v3.4.2-50-gb427a3f9 (UAPI 6)**, and extracts the exact
+compatible ARM64 daemon from that APK. The build verifies the manager SHA256,
+APK v2 certificate against the KernelSU trusted signer, and embedded daemon
+SHA256 against the one that already ran successfully on-device. If upstream
+CI artifact access fails, the build fails rather than substituting UAPI 5.
+
+The old all-in-one ZIP should not be reused for new installs. Existing
+phones can update just the manager APK to build 33405: no reflash needed.

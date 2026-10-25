@@ -89,7 +89,7 @@ if [ -f "$VECTOR/service.sh" ]; then
   tmp="$VECTOR/service.sh.g965f-tmp"
   cat > "$tmp" <<'EOS'
 #!/system/bin/sh
-MODDIR=__VECTOR_MODULE_DIR__
+MODDIR="${0%/*}"
 BB=/data/adb/ksu/bin/busybox
 LOG=/data/local/tmp/vector-boot-trace.log
 echo "$(date) SERVICE ENTERED uid=$(id -u) context=$(id -Z)" >> "$LOG"
@@ -108,7 +108,6 @@ fi
 ) &
 echo "$(date) DAEMON SPAWNED PID=$!" >> "$LOG"
 EOS
-  sed -i "s|__VECTOR_MODULE_DIR__|$VECTOR|g" "$tmp" || fail "cannot customize Vector module path"
   /system/bin/sh -n "$tmp" || fail "Vector script syntax validation failed"
   replace_from_tmp "$VECTOR/service.sh" "$tmp" ||
     fail "cannot install Vector startup fix"

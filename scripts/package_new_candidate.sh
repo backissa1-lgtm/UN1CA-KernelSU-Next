@@ -25,6 +25,18 @@ test -s "$tmp/repack/floyd/G965F-dtb"
 # The existing recovery installer is left intact except for a G965F-only
 # success hook, which runs the helper only if decrypted /data is accessible.
 install -D -m 0755 "$root/bootchain/apply.sh" "$tmp/repack/bootchain/apply.sh"
+install -D -m 0755 "$root/bootchain/recovery-stage.sh" "$tmp/repack/bootchain/recovery-stage.sh"
+install -D -m 0755 "$root/bootchain/first-boot.sh" "$tmp/repack/bootchain/first-boot.sh"
+install -D -m 0644 "$root/bootchain/assets.manifest" "$tmp/repack/bootchain/assets.manifest"
+for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip; do
+  test -s "$root/bootchain/downloads/$name"
+  install -D -m 0644 "$root/bootchain/downloads/$name" "$tmp/repack/bootchain/assets/$name"
+done
+# Verify all packaged releases using the upstream SHA-256 digests.
+while read -r name digest url; do
+  case "$name" in ""|\#*) continue;; esac
+  echo "$digest  $tmp/repack/bootchain/assets/$name" | sha256sum -c - >/dev/null
+done < "$root/bootchain/assets.manifest"
 python3 "$root/scripts/inject_bootchain_hook.py" \
   "$tmp/repack/META-INF/com/google/android/update-binary"
 grep -q 'G965F_BOOTCHAIN_INTEGRATION_V1' "$tmp/repack/META-INF/com/google/android/update-binary"
@@ -54,10 +66,22 @@ Verified derivative ZIP SHA256: $template_sha
 Only G965F-kernel patch changed; original G965F DTB retained.
 Installer preserves current phone ramdisk.
 SELinux Enforcing retained. Linux 4.9 init -> u:r:ksu:s0 bounded-exec exception corrected.
-G965F boot-chain post-flash helper included: bootchain/apply.sh.
-On successful recovery flash, it runs automatically ONLY if /data/adb/modules
-is accessible (recovery has decrypted /data). Otherwise run after first boot:
-  su -c 'sh /path/to/extracted/bootchain/apply.sh'
+G965F all-in-one boot-chain bundle:
+  bootchain/recovery-stage.sh
+  bootchain/first-boot.sh
+  bootchain/apply.sh
+  bootchain/assets/*.apk, *.zip and official UAPI6 ARM64 ksud
+Pinned, SHA256-verified upstream files:
+  KernelSU Next manager v3.4.2 (33355) with ARM64 ksud
+  NeoZygisk v2.4 (289)
+  Vector v2.2 (3080)
+Recovery stage protects the daemon and stages PackageManager/KSU module setup.
+Boot stage installs manager, NeoZygisk and Vector and patches their scripts.
+One more Android reboot is necessary to activate newly installed Zygisk modules.
+On successful recovery flash, it stages setup only when /data/adb
+is accessible and writable (recovery decrypted /data). Otherwise this bundle
+cannot automatically install the APK/modules on first boot; recovery logs
+must be checked and setup performed separately from running Android.
 The helper preserves the verified UAPI 6 /data/adb/ksud, protects it using
 F2FS immutable (remove before future KernelSU userspace upgrades), patches
 NeoZygisk post-fs-data.sh against repeated monitor/socket destruction, and

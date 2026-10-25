@@ -8,8 +8,6 @@ umask 022
 TAG=G965FBootchain
 KSU=/data/adb/ksud
 KSU_BACKUP=/data/adb/ksud.uapi6
-VECTOR=/data/adb/modules/zygisk_vector
-NEO=/data/adb/modules/zygisksu
 
 say() { echo "$TAG: $*"; }
 fail() { say "ERROR: $*"; exit 1; }
@@ -80,13 +78,18 @@ fi
 immutable "$KSU" || fail "daemon remains writable"
 say "UAPI 6 daemon protected from UN1CA boot overwrite"
 
+# Newly installed KernelSU modules may be pending under modules_update.
+for MODULE_BASE in /data/adb/modules /data/adb/modules_update; do
+[ -d "$MODULE_BASE" ] || continue
+VECTOR="$MODULE_BASE/zygisk_vector"
+NEO="$MODULE_BASE/zygisksu"
 if [ -f "$VECTOR/service.sh" ]; then
   backup_once "$VECTOR/service.sh" "$VECTOR/service.sh.before-bootchain-auto" ||
     fail "cannot back up Vector service"
   tmp="$VECTOR/service.sh.g965f-tmp"
   cat > "$tmp" <<'EOS'
 #!/system/bin/sh
-MODDIR=/data/adb/modules/zygisk_vector
+MODDIR=__VECTOR_MODULE_DIR__
 BB=/data/adb/ksu/bin/busybox
 LOG=/data/local/tmp/vector-boot-trace.log
 echo "$(date) SERVICE ENTERED uid=$(id -u) context=$(id -Z)" >> "$LOG"
@@ -105,6 +108,7 @@ fi
 ) &
 echo "$(date) DAEMON SPAWNED PID=$!" >> "$LOG"
 EOS
+  sed -i "s|__VECTOR_MODULE_DIR__|$VECTOR|g" "$tmp" || fail "cannot customize Vector module path"
   /system/bin/sh -n "$tmp" || fail "Vector script syntax validation failed"
   replace_from_tmp "$VECTOR/service.sh" "$tmp" ||
     fail "cannot install Vector startup fix"
@@ -146,5 +150,6 @@ EOS
 else
   say "NeoZygisk not installed; skipped NeoZygisk patch"
 fi
+done
 say "boot-chain setup complete; reboot to activate module scripts"
 exit 0

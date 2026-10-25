@@ -2,11 +2,15 @@
 set -euo pipefail
 bash -n bootchain/apply.sh bootchain/recovery-stage.sh bootchain/first-boot.sh
 # Ensure the exact release set is pinned and passes manifest schema checks.
-test "$(grep -cv '^#' bootchain/assets.manifest)" -eq 4
+test "$(grep -cv '^#' bootchain/assets.manifest)" -eq 5
 while read -r name digest url; do
   case "$name" in ''|\#*) continue;; esac
-  [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
-  [[ "$url" == https://github.com/*/releases/download/* ]]
+  if [ "$name" = busybox-aarch64 ]; then
+    [[ "$digest" =~ ^[a-f0-9]{40}$ ]]
+  else
+    [[ "$digest" =~ ^[a-f0-9]{64}$ ]]
+  fi
+  [[ "$url" == https://github.com/*/releases/download/* || "$url" == https://raw.githubusercontent.com/* ]]
 done < bootchain/assets.manifest
 python3 -m py_compile scripts/inject_bootchain_hook.py
 

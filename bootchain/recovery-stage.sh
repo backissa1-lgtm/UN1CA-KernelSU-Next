@@ -19,18 +19,32 @@ umask 022
 # Check all four official release digests before any change to boot services.
 unzip -p "$ZIP" bootchain/assets.manifest > "$STAGE/assets.manifest" ||
   fail "cannot read official hashes"
-for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip; do
+for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip busybox-aarch64; do
   digest="$(awk -v n="$name" '$1 == n { print $2 }' "$STAGE/assets.manifest")"
   [ -n "$digest" ] || fail "no checksum for $name"
   unzip -p "$ZIP" "bootchain/assets/$name" > "$STAGE/assets/$name.tmp" ||
     fail "cannot extract $name"
-  actual="$(sha256sum "$STAGE/assets/$name.tmp" | cut -d ' ' -f 1)"
+  if [ "$name" = busybox-aarch64 ]; then
+    # The official Linux ARM64 BusyBox is pinned by its upstream Git blob ID.
+    actual="$( { printf 'blob %s\0' "$(wc -c < "$STAGE/assets/$name.tmp")"; cat "$STAGE/assets/$name.tmp"; } | sha1sum | cut -d ' ' -f 1)"
+  else
+    actual="$(sha256sum "$STAGE/assets/$name.tmp" | cut -d ' ' -f 1)"
+  fi
   [ "$actual" = "$digest" ] || fail "invalid digest for $name"
   mv -f "$STAGE/assets/$name.tmp" "$STAGE/assets/$name"
 done
-say "all four upstream SHA256 digests verified"
+say "four SHA256 hashes and official BusyBox Git blob verified"
 
 BB=/data/adb/ksu/bin/busybox
+if [ ! -x "$BB" ]; then
+  say "provisioning pinned upstream ARM64 BusyBox for first boot"
+  mkdir -p /data/adb/ksu/bin || fail "cannot create KernelSU executable directory"
+  cp -p "$STAGE/assets/busybox-aarch64" "$BB" || fail "cannot install BusyBox"
+  chmod 0755 "$BB"
+  chcon u:object_r:ksu_file:s0 "$BB" 2>/dev/null || :
+fi
+[ -x "$BB" ] || fail "cannot prepare BusyBox"
+
 valid_ksud() {
   [ -x "$1" ] && "$1" --version 2>&1 | grep -q 'uapi: 6'
 }

@@ -28,14 +28,19 @@ install -D -m 0755 "$root/bootchain/apply.sh" "$tmp/repack/bootchain/apply.sh"
 install -D -m 0755 "$root/bootchain/recovery-stage.sh" "$tmp/repack/bootchain/recovery-stage.sh"
 install -D -m 0755 "$root/bootchain/first-boot.sh" "$tmp/repack/bootchain/first-boot.sh"
 install -D -m 0644 "$root/bootchain/assets.manifest" "$tmp/repack/bootchain/assets.manifest"
-for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip; do
+for name in KernelSU_Next_v3.4.2_33355-release.apk ksud-aarch64-linux-android NeoZygisk-v2.4-289-release.zip Vector-v2.2-3080-Release.zip busybox-aarch64; do
   test -s "$root/bootchain/downloads/$name"
   install -D -m 0644 "$root/bootchain/downloads/$name" "$tmp/repack/bootchain/assets/$name"
 done
 # Verify all packaged releases using the upstream SHA-256 digests.
 while read -r name digest url; do
   case "$name" in ""|\#*) continue;; esac
-  echo "$digest  $tmp/repack/bootchain/assets/$name" | sha256sum -c - >/dev/null
+  if [ "$name" = busybox-aarch64 ]; then
+    got="$( { printf 'blob %s\0' "$(stat -c%s "$tmp/repack/bootchain/assets/$name")"; cat "$tmp/repack/bootchain/assets/$name"; } | sha1sum | awk '{print $1}')"
+    test "$got" = "$digest"
+  else
+    echo "$digest  $tmp/repack/bootchain/assets/$name" | sha256sum -c - >/dev/null
+  fi
 done < "$root/bootchain/assets.manifest"
 python3 "$root/scripts/inject_bootchain_hook.py" \
   "$tmp/repack/META-INF/com/google/android/update-binary"

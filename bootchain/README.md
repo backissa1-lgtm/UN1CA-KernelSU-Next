@@ -133,3 +133,32 @@ CI artifact access fails, the build fails rather than substituting UAPI 5.
 
 The old all-in-one ZIP should not be reused for new installs. Existing
 phones can update just the manager APK to build 33405: no reflash needed.
+
+## Permanent Termux and app root-permission persistence fix
+
+The user confirmed that `/data/adb/ksu/.allowlist` contained the permitted
+Termux profile (`com.termux`, UID 10320), and Linux logged a successful
+`save allow list`. On every reboot, at post-fs-data, the kernel instead
+logged `allowlist file invalid: 0!` and `ksud profile get com.termux`
+returned `stored: false`, `allow_su: false`. The file and termux record
+were still present; permission pruning was not responsible.
+
+**Cause:** SM-G965F uses Linux **4.9.337**, where `kernel_read()` takes the
+old argument signature. KernelSU legacy commit `0b17f242` mistakenly
+called the 4.14+ `kernel_read(file, buffer, count, &offset)` signature three
+times within `ksu_load_allow_list()`. It already supplies a helper
+`ksu_kernel_read_compat()` that selects the correct argument order on 4.9.
+The save routine already uses `ksu_kernel_write_compat()`.
+
+At compile time, `scripts/fix_ksu_allowlist_persistence.py` converts
+the three allowlist reads (magic, format version, and profile) to
+`ksu_kernel_read_compat()`. Verification requires all three conversions,
+and the CI regression test exercises this patch. It does **not** write
+the saved allowlist, grant root to any app, suppress profile validation, or
+change SELinux. Existing app permissions should be restored automatically.
+
+**Validation still needed on-device:** On the patched ZIP, grant Termux
+root once, verify `/data/adb/ksud profile get com.termux` shows
+`stored: true` and `allow_su: true`, reboot, and verify the same values
+without opening the manager. The boot log should show `allowlist version: 4`
+and `load_allow_uid, name: com.termux` instead of `allowlist file invalid`.

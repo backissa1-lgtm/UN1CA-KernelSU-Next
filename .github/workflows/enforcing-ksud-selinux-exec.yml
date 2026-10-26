@@ -62,6 +62,12 @@ jobs:
           python3 scripts/fix_ksu_allowlist_persistence.py candidate/KernelSU-Next/kernel/policy/allowlist.c
           python3 scripts/fix_ksu_allowlist_persistence.py --verify candidate/KernelSU-Next/kernel/policy/allowlist.c
           grep -Fq 'ksu_kernel_read_compat(fp, &magic, sizeof(magic), &off)' candidate/KernelSU-Next/kernel/policy/allowlist.c
+          # KernelSU also reads packages.list using the wrong ABI on Linux 4.9.
+          # Correct both reads before UID validation can prune valid profiles.
+          python3 scripts/fix_ksu_throne_tracker_reads.py candidate/KernelSU-Next/kernel/manager/throne_tracker.c
+          python3 scripts/fix_ksu_throne_tracker_reads.py --verify candidate/KernelSU-Next/kernel/manager/throne_tracker.c
+          grep -Fq 'ksu_kernel_read_compat(fp, &chr, sizeof(chr), &pos)' candidate/KernelSU-Next/kernel/manager/throne_tracker.c
+          grep -Fq 'ksu_kernel_read_compat(fp, buf, sizeof(buf) - 1, &line_start)' candidate/KernelSU-Next/kernel/manager/throne_tracker.c
           python3 scripts/restore_susfs_bridges.py kernel/KernelSU-Next/kernel candidate/KernelSU-Next/kernel
           # Keep original UN1CA SUSFS v1.5.5 and validated KernelSU Next
           # integration. Repair only the missing userspace boot prerequisite.

@@ -7,13 +7,14 @@ STAGE=/data/adb/g965f-bootchain
 ASSETS="$STAGE/assets"
 KSU=/data/adb/ksud
 DONE="$STAGE/setup.done"
+PENDING="$STAGE/setup.pending"
 LOCK="$STAGE/setup.lock"
 say() { echo "$(date) FIRST-BOOT: $*"; }
 fail() { say "ERROR: $*"; exit 1; }
 
 [ "$(id -u)" = 0 ] || fail "root required"
 [ -d "$ASSETS" ] || fail "recovery did not stage official assets"
-[ -f "$DONE" ] && exit 0
+[ -f "$PENDING" ] || exit 0
 
 # Avoid racing KernelSU's repeated 'services' events.
 if ! mkdir "$LOCK" 2>/dev/null; then
@@ -96,9 +97,16 @@ for id in zygisksu zygisk_vector; do
   [ "$found" -eq 1 ] || fail "missing $id after repairs"
 done
 say "all components installed, patched, and staged for next boot"
+# Complete before requesting reboot; no pending marker survives to trigger a loop.
 touch "$DONE" || fail "cannot record setup success"
+rm -f "$PENDING" || fail "cannot consume one-shot reboot trigger"
+printf '%s\n' "$(date)" > "$STAGE/reboot.requested" ||
+  fail "cannot log reboot request"
 sync
-say "one-time reboot to activate NeoZygisk and Vector"
+say "one-time automatic reboot requested for this ZIP flash"
 sleep 3
-reboot
+if ! reboot; then
+  say "reboot command failed; requesting reboot via Android powerctl"
+  setprop sys.powerctl reboot || fail "automatic reboot failed; reboot manually"
+fi
 exit 0

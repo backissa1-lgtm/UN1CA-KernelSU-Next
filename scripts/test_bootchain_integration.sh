@@ -13,7 +13,7 @@ while read -r name digest url; do
   [[ "$url" == https://github.com/*/releases/download/* || "$url" == https://raw.githubusercontent.com/* || "$url" == https://github.com/KernelSU-Next/KernelSU-Next/actions/runs/39297115788 ]]
 done < bootchain/assets.manifest
 python3 -m py_compile scripts/inject_bootchain_hook.py
-python3 -m py_compile scripts/fix_ksu_allowlist_persistence.py
+python3 -m py_compile scripts/fix_ksu_allowlist_persistence.py scripts/fix_ksu_throne_tracker_reads.py
 allowlist_test="$(mktemp)"
 trap 'rm -f "$allowlist_test"' EXIT
 cat > "$allowlist_test" <<'EOS'
@@ -31,6 +31,39 @@ python3 scripts/fix_ksu_allowlist_persistence.py "$allowlist_test"
 python3 scripts/fix_ksu_allowlist_persistence.py --verify "$allowlist_test"
 ! grep -Eq '(^|[^a-zA-Z_])kernel_read\(fp, &' "$allowlist_test"
 rm -f "$allowlist_test"
+
+tracker_test="$(mktemp)"
+cat > "$tracker_test" <<'EOS'
+#include "ksu.h"
+ssize_t demo(void) {
+  ssize_t count = kernel_read(fp, &chr, sizeof(chr), &pos);
+  count = kernel_read(fp, buf, sizeof(buf) - 1, &line_start);
+  return count;
+}
+EOS
+python3 scripts/fix_ksu_throne_tracker_reads.py "$tracker_test"
+python3 scripts/fix_ksu_throne_tracker_reads.py --verify "$tracker_test"
+grep -Fq '#include "compat/kernel_compat.h"' "$tracker_test"
+test "$(grep -c 'ksu_kernel_read_compat(' "$tracker_test")" -eq 2
+! grep -Eq '(^|[^a-zA-Z_])kernel_read\(fp,' "$tracker_test"
+rm -f "$tracker_test"
+
+# Re-flashing cannot skip the one-time module service because of old setup.done.
+grep -Fq 'touch "$STAGE/setup.pending"' bootchain/recovery-stage.sh
+grep -Fq 'rm -f "$STAGE/setup.done"' bootchain/recovery-stage.sh
+grep -Fq 'rm -f "$MOD/disable" "$MOD/remove"' bootchain/recovery-stage.sh
+grep -Fq '[ -f "$STAGE/setup.pending" ] || exit 0' bootchain/recovery-stage.sh
+grep -Fq '[ -f "$PENDING" ] || exit 0' bootchain/first-boot.sh
+grep -Fq 'rm -f "$PENDING" || fail' bootchain/first-boot.sh
+python3 - <<'PY'
+from pathlib import Path
+stage = Path("bootchain/recovery-stage.sh").read_text()
+first = Path("bootchain/first-boot.sh").read_text()
+assert stage.index('touch "$STAGE/setup.pending"') > stage.index('touch "$MOD/skip_mount"')
+assert stage.index('rm -f "$STAGE/setup.done"') > stage.index('touch "$STAGE/setup.pending"')
+assert first.index('touch "$DONE"') < first.index('rm -f "$PENDING"') < first.index('if ! reboot;')
+assert '[ -f "$DONE" ] && exit 0' not in first
+PY
 
 
 tmp="$(mktemp -d)"

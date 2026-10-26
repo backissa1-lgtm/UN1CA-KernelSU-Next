@@ -89,7 +89,8 @@ EOF
 cat > "$MOD/service.sh" <<'EOF'
 #!/system/bin/sh
 STAGE=/data/adb/g965f-bootchain
-[ -f "$STAGE/setup.done" ] && exit 0
+[ -f "$STAGE/setup.pending" ] || exit 0
+echo "$(date) BOOT-SERVICE: pending setup detected" >> "$STAGE/setup.log"
 # Do not keep the boot service's init process group: init kills it
 # after ksud services exits. A new session survives until Android boot completes.
 BB=/data/adb/ksu/bin/busybox
@@ -101,6 +102,8 @@ fi
 EOF
 chmod 0755 "$MOD/service.sh"
 touch "$MOD/skip_mount"
+# A recovery reflash re-enables the one-shot bootstrap module.
+rm -f "$MOD/disable" "$MOD/remove" || fail "cannot re-enable setup module"
 
 # Rebuildable cache only: do not erase app data or entire ART data directory.
 if [ "$(getprop sys.boot_completed 2>/dev/null)" = 1 ]; then
@@ -114,6 +117,14 @@ else
     [ -d "$dir" ] && [ ! -L "$dir" ] && rm -rf "$dir" 2>/dev/null || :
   done
 fi
+# Re-arm only after ALL files and scripts are staged successfully.
+# Re-flashing the ZIP must not inherit completion from a previous installation.
+# Old first-boot PID locks cannot be live in offline recovery.
+if [ "$(getprop sys.boot_completed 2>/dev/null)" != 1 ]; then
+  rm -rf "$STAGE/setup.lock" || fail "cannot clear stale setup lock"
+fi
+touch "$STAGE/setup.pending" || fail "cannot re-arm first-boot setup"
+rm -f "$STAGE/setup.done" || fail "cannot clear previous setup completion"
 sync
-say "Recovery preparation complete; Android first-boot setup pending"
+say "Recovery preparation complete; new first-boot setup armed for this ZIP"
 exit 0

@@ -2,17 +2,18 @@
 
 Target: Samsung S9+ SM-G965F (star2lte, Exynos 9810), UN1CA Android 16 / One UI 8, Linux 4.9.337, EROFS, SELinux Enforcing.
 
-**Status: the base kernel booted on the target phone with KernelSU Next UAPI 6, NeoZygisk and Vector. The new all-in-one recovery + first-boot installer on this side branch has NOT yet been flash-tested.**
+**Status: the earlier kernel booted on the target phone with KernelSU Next UAPI 6, NeoZygisk and Vector. The V1.14-based UAPI 6 candidate and its all-in-one recovery + first-boot installer have NOT yet been built or flash-tested.**
 
 Pinned source:
-- Eend15/exynos9810-kernel @ 8f29b4e0e977d521bb5866ad167b391bea2988c9 (October 1, 2026)
+- Unofficial-Un1ca-9810 Android-16 @ 4036caf75a66ee3ec2b0882ae1a192344977c931 (November 15, 2026)
+- Eend15/exynos9810-kernel @ 5981121c45168ea74b12e36675d0f4532cb5aa6c (DS-ACK V1.14, November 14, 2026)
 - KernelSU-Next/KernelSU-Next legacy @ 0b17f24246db5c80c056b92c15bcad2b77f1276e (October 17, 2026)
 
-The UN1CA ROM [maintainer documentation](https://github.com/Eend15/Unofficial-Un1ca-9810/blob/Android-16/platform/exynos9810/prebuilt/README.md) reports a boot-tested October 14 G965F kernel with KernelSU Next v3.4.0 and SUSFS. The published October 1 source is not necessarily the source of that exact binary.
+The ROM's current default EROFS kernel archive is DS-ACK V1.14, with KernelSU Next v3.4.0-legacy/UAPI 4. Its published SHA-256 is `768981b1bc670bf22f8fa8555aad2b2a7a684a5b572099a63bbbb22ba9972acc`. The V1.14 source adds the current touch wake and panel brightness fixes. The candidate workflow uses that exact source and package, then overlays the previously working v3.4.2 legacy/UAPI 6 driver. It keeps the V1.14 G965F DTB and installer.
 
-The active legacy KernelSU Next **driver integration** is the appropriate starting point for Linux 4.9. The modern v3.4.2 GKI driver is NOT a drop-in replacement. "Legacy" describes integration, not necessarily an old manager version.
+KernelSU Next v3.4.2 **legacy** is the compatibility target for Linux 4.9. The modern v3.4.2 GKI driver is not a drop-in replacement.
 
-The [build workflow](../../actions/workflows/kernel.yml) fetches the pinned sources, generates a comparison, then attempts baseline and updated-driver G965F builds while checking that SUSFS remains enabled. Both produce ONLY UNVERIFIED build artifacts. No image will be treated as safe to flash until compatibility and boot testing are complete.
+The [build workflow](../../actions/workflows/enforcing-ksud-selinux-exec.yml) fetches the pinned sources, reapplies the proven Linux 4.9 and UN1CA compatibility patches, builds only the SM-G965F kernel Image, and packages it against the verified V1.14 EROFS ZIP. It preserves the V1.14 DTB, current SELinux hooks, UAPI 6 daemon protection, NeoZygisk and Vector setup. Outputs remain unverified until the new candidate boots on the phone.
 
 Both Enforcing and Permissive DS-ACK V3.2.1-susfs2 builds were already tested by the user and bootlooped at the first logo, so those binaries are excluded.
 

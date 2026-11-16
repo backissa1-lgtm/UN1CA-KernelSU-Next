@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
-"""Add a G965F-only successful-flash EXIT hook to UN1CA's update-binary.
+"""Restrict the installer to G965F and add its successful-flash EXIT hook.
 
 The original installer is preserved, including its exit status. Applying
 userland fixes is best-effort because custom recoveries may not decrypt /data.
-This build step aborts if the original selector/layout no longer matches.
+The V1.14 package starts with a six-device selector; narrow that selector to
+the S9+ before adding the hook. Abort if either known layout has changed.
 """
 from pathlib import Path
 import sys
@@ -12,8 +13,13 @@ if len(sys.argv) != 2:
     raise SystemExit("usage: inject_bootchain_hook.py path/to/update-binary")
 p = Path(sys.argv[1])
 src = p.read_text(errors="replace")
+all_devices = "if echo $device | grep '[GN]96[05][FN]'; then"
 marker = "if echo $device | grep 'G965F'; then"
 sentinel = "G965F_BOOTCHAIN_INTEGRATION_V1"
+if src.count(all_devices) == 1 and src.count(marker) == 0:
+    src = src.replace(all_devices, marker, 1)
+elif src.count(all_devices) != 0 or src.count(marker) != 1:
+    raise SystemExit("Unknown installer device-selection layout")
 if src.count(marker) != 1:
     raise SystemExit("Unknown installer device-selection layout")
 if sentinel in src:
@@ -59,4 +65,5 @@ src = src.replace(marker, marker +
 p.write_text(src)
 assert src.count(sentinel) == 1
 assert src.count("g965f_bootchain_on_exit $?") == 1
+assert all_devices not in src
 print("Installed G965F-only post-success boot-chain helper hook")

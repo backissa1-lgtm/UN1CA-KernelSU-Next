@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Rebase G965F kernel against verified derivative of UN1CA installer; preserve tested DTB.
+# Rebase the V1.14 G965F kernel package with the candidate Image; preserve its DTB.
 set -euo pipefail
 if [[ "$#" != 3 ]]; then
-  echo "usage: $0 verified-template.zip candidate-boot.img output.zip" >&2
+  echo "usage: $0 V1.14-template.zip candidate-kernel-Image output.zip" >&2
   exit 2
 fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 template="$(realpath "$1")"
 image="$(realpath "$2")"
 output="$(realpath -m "$3")"
-template_sha="3c10792029483d354e8b2e9072379cd0a9af653b003f3f319530d6852a8d0a2f"
-original_sha="3e405a08fd5e0b4f8492096be9003349bb8372e4f16ec43f0308095d6615203f"
+template_sha="${KERNEL_TEMPLATE_SHA256:-768981b1bc670bf22f8fa8555aad2b2a7a684a5b572099a63bbbb22ba9972acc}"
+kernel_source_commit="${KERNEL_SOURCE_COMMIT:-unknown}"
+ksu_source_commit="${KSU_SOURCE_COMMIT:-unknown}"
 echo "$template_sha  $template" | sha256sum -c -
 for cmd in bsdiff bspatch unzip zip python3; do command -v "$cmd" >/dev/null; done
 tmp="$(mktemp -d)"
@@ -45,8 +46,8 @@ done < "$root/bootchain/assets.manifest"
 python3 "$root/scripts/inject_bootchain_hook.py" \
   "$tmp/repack/META-INF/com/google/android/update-binary"
 grep -q 'G965F_BOOTCHAIN_INTEGRATION_V1' "$tmp/repack/META-INF/com/google/android/update-binary"
-python3 "$root/scripts/extract_android_boot_v0.py" \
-  "$image" "$tmp/kernel" "$tmp/candidate-dtb" > "$tmp/kernel-metadata.json"
+cp "$image" "$tmp/kernel"
+test -s "$tmp/kernel"
 
 # Replace only G965F kernel delta and prove it reconstructs the new kernel exactly.
 bsdiff "$tmp/repack/floyd/G960F-kernel" "$tmp/kernel" "$tmp/repack/floyd/G965F-kernel"
@@ -66,18 +67,19 @@ PY
 cat > "$tmp/repack/BUILD-NOTES.txt" <<EOF
 EXPERIMENTAL G965F KERNEL. NOT BOOT-TESTED ON DEVICE.
 SM-G965F/star2lte, UN1CA Android 16, EROFS, Enforcing; SUSFS v1.5.5 preserved.
-UN1CA source installer SHA256: $original_sha
-Verified derivative ZIP SHA256: $template_sha
-Only G965F-kernel patch changed; original G965F DTB retained.
-Installer preserves current phone ramdisk.
-SELinux Enforcing retained. Linux 4.9 init -> u:r:ksu:s0 bounded-exec exception corrected.
+UN1CA V1.14 default EROFS kernel ZIP SHA256: $template_sha
+Kernel source commit: $kernel_source_commit
+KernelSU Next source commit: $ksu_source_commit
+Only G965F-kernel patch changed; V1.14 G965F DTB retained.
+Installer preserves the phone's current boot ramdisk.
+SELinux Enforcing retained; the V1.14 init -> u:r:ksu:s0 bounded-exec exception is preserved.
 G965F all-in-one boot-chain bundle:
   bootchain/recovery-stage.sh
   bootchain/first-boot.sh
   bootchain/apply.sh
   bootchain/assets/*.apk, *.zip and official UAPI6 ARM64 ksud
 Pinned, SHA256-verified upstream files:
-  KernelSU Next manager v3.4.2 (33355) with ARM64 ksud
+  KernelSU Next manager v3.4.2-50 build 33405 (UAPI 6) with ARM64 ksud
   NeoZygisk v2.4 (289)
   Vector v2.2 (3080)
 Recovery stage protects the daemon and stages PackageManager/KSU module setup.
@@ -94,9 +96,8 @@ patches Vector service.sh to use BusyBox unshare without force-restarting
 system_server. Every edited module script gets a backup, and the helper
 is idempotent. It does NOT bundle a ksud binary or create /metadata mounts.
 If UAPI 6 ksud is absent, install a compatible manager/daemon first.
-Only the kernel itself is known to have booted on the target. The newly
-integrated recovery hook is not yet flash-tested. Inspect installation logs.
-Candidate boot image SHA256: $(sha256sum "$image" | awk '{print $1}')
+The earlier kernel build booted on the target. This V1.14-based candidate and
+the integrated recovery hook are not yet flash-tested. Inspect installation logs.
 Candidate kernel Image SHA256: $(sha256sum "$tmp/kernel" | awk '{print $1}')
 Preserved G965F DTB SHA256: $(sha256sum "$tmp/original-G965F-dtb" | awk '{print $1}')
 Kernel build run ID: ${BUILD_RUN_ID:-unknown}
